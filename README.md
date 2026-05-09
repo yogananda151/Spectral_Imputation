@@ -1,5 +1,5 @@
 <p align="Center">
-  <img src="MFC4_D12_Spectral_Imputation-main/images/Logo.jpeg" width="300"/>
+  <img src="images/Logo.jpeg" width="300"/>
 </p>
 
 # Spectral Imputation of Missing Air Pollution Time-Series Data
