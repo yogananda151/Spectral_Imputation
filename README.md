@@ -3,16 +3,6 @@
 </p>
 
 # Spectral Imputation of Missing Air Pollution Time-Series Data
-
-AIE D – Batch Group 12
-
-## Team Members
-
-* G Nishanth Chowdary – CB.SC.U4AIE24319
-* K Venkata Sree Rama Kumar – CB.SC.U4AIE24326
-* K Yogananda Reddy – CB.SC.U4AIE24327
-* Sairi Manvik – CB.SC.U4AIE24352
-
 ---
 
 ## Base Paper
