@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AirSense Pro — Air Pollution Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #070b14;
+  --surface: #0d1220;
+  --surface2: #131825;
+  --surface3: #1a2035;
+  --border: #1e2840;
+  --border2: #253050;
+  --text: #e0eaff;
+  --muted: #5a6a90;
+  --muted2: #8a9ab8;
+  --accent: #00ffc8;
+  --accent2: #00a8ff;
+  --accent3: #7b5ea7;
+  --danger: #ff5f85;
+  --warn: #ffc300;
+  --positive: #00ffc8;
+  --negative: #ff5f85;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── ANIMATED BG ── */
+body::before {
+  content:'';
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(0,255,200,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,168,255,0.04) 0%, transparent 60%);
+  pointer-events:none;
+  animation: bgPulse 8s ease-in-out infinite alternate;
+}
+@keyframes bgPulse {
+  from { opacity:0.6; }
+  to   { opacity:1; }
+}
+
+/* ── LAYOUT ── */
+.shell { display:flex; min-height:100vh; position:relative; z-index:1; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width:240px; flex-shrink:0;
+  background: rgba(13,18,32,0.95);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:fixed; top:0; left:0; bottom:0;
+  backdrop-filter:blur(12px);
+  z-index:100;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-logo {
+  padding:28px 24px 20px;
+  border-bottom:1px solid var(--border);
+}
+.logo-dot {
+  display:inline-block; width:8px; height:8px;
+  background:var(--accent); border-radius:50%;
+  margin-right:6px;
+  animation: livePulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--accent);
+}
+@keyframes livePulse {
+  0%,100%{ opacity:1; transform:scale(1); }
+  50%{ opacity:0.5; transform:scale(0.8); }
+}
+.logo-tag {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:rgba(0,255,200,0.5);
+  text-transform:uppercase; letter-spacing:0.2em;
+  margin-bottom:6px;
+}
+.logo-name {
+  font-size:1.4rem; font-weight:800;
+  background:linear-gradient(135deg,#00ffc8 0%,#00a8ff 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.logo-sub {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  margin-top:2px;
+}
+
+.nav-section {
+  padding: 16px 0 8px;
+  overflow-y:auto; flex:1;
+}
+.nav-label {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.18em;
+  padding:0 20px; margin-bottom:6px; margin-top:10px;
+}
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 20px;
+  cursor:pointer;
+  font-size:0.88rem; font-weight:600;
+  color:var(--muted2);
+  border-left:3px solid transparent;
+  transition:all 0.2s;
+  user-select:none;
+}
+.nav-item:hover {
+  color:var(--text);
+  background:rgba(0,255,200,0.04);
+  border-left-color:rgba(0,255,200,0.3);
+}
+.nav-item.active {
+  color:var(--accent);
+  background:rgba(0,255,200,0.07);
+  border-left-color:var(--accent);
+}
+.nav-icon { font-size:1rem; width:20px; text-align:center; }
+
+.nav-divider {
+  height:1px; background:var(--border);
+  margin:12px 20px;
+}
+
+.sidebar-footer {
+  padding:16px 20px;
+  border-top:1px solid var(--border);
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  line-height:1.8;
+}
+
+/* ── MAIN ── */
+.main {
+  margin-left:240px;
+  flex:1;
+  min-height:100vh;
+  padding:0 0 60px;
+  overflow-x:hidden;
+  width: calc(100% - 240px);
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  padding:28px 40px 0;
+  display:flex; align-items:flex-end; justify-content:space-between;
+  flex-wrap:wrap; gap:16px;
+  margin-bottom:28px;
+  width:100%;
+  box-sizing:border-box;
+}
+.page-hero-title {
+  font-size:2.6rem; font-weight:800; line-height:1.1;
+  background:linear-gradient(135deg,#00ffc8 0%,#00a8ff 50%,#7b5ea7 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation: fadeUp 0.5s ease-out;
+}
+.page-hero-sub {
+  font-family:'Space Mono',monospace;
+  font-size:10px; color:rgba(0,255,200,0.5);
+  text-transform:uppercase; letter-spacing:0.18em;
+  margin-top:4px;
+  animation: fadeUp 0.6s ease-out;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── CONTENT AREA ── */
+.content { padding:0 40px; width:100%; box-sizing:border-box; }
+
+/* ── PAGE (tab panel) ── */
+.page-panel { display:none; animation:fadeUp 0.4s ease-out; }
+.page-panel.active { display:block; }
+
+/* ── SECTION TITLE ── */
+.sec-title {
+  font-size:1.1rem; font-weight:700;
+  color:var(--accent);
+  border-left:3px solid var(--accent);
+  padding-left:12px;
+  margin:28px 0 16px;
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  display: block;
+  border:2px dashed var(--border2);
+  border-radius:14px;
+  padding:48px 40px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.25s;
+  background:var(--surface);
+  position:relative;
+  overflow:hidden;
+  width:100%;
+  max-width:680px;
+}
+.upload-zone::before {
+  content:'';
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(0,255,200,0.03) 0%,transparent 70%);
+  pointer-events:none;
+  z-index:0;
+}
+.upload-zone > * { position:relative; z-index:1; }
+.upload-zone:hover, .upload-zone.dragover {
+  border-color:var(--accent);
+  background:rgba(0,255,200,0.04);
+}
+.upload-zone.loaded {
+  border-color:#00c850; border-style:solid;
+  background:rgba(0,200,80,0.04);
+}
+.upload-zone input {
+  position:absolute; top:0; left:0;
+  width:100%; height:100%;
+  opacity:0; cursor:pointer;
+  z-index:3;
+}
+.upload-icon { font-size:2.5rem; margin-bottom:10px; }
+.upload-title {
+  font-size:1rem; font-weight:700;
+  color:var(--text); margin-bottom:4px;
+}
+.upload-hint {
+  font-family:'Space Mono',monospace;
+  font-size:10px; color:var(--muted);
+  letter-spacing:0.1em; margin-bottom:14px;
+}
+.upload-cta {
+  display:inline-block; padding:8px 22px;
+  border-radius:7px; background:var(--accent);
+  color:#070b14; font-size:12px; font-weight:700;
+  font-family:'Syne',sans-serif; letter-spacing:0.05em;
+  pointer-events:none;
+}
+.upload-status {
+  font-family:'Space Mono',monospace;
+  font-size:11px; margin-top:12px;
+  min-height:18px; color:#00c850; font-weight:500;
+}
+
+/* ── METRIC CARDS ── */
+.metrics-row {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:16px;
+  margin:20px 0;
+}
+.metric-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px 20px;
+  transition:all 0.25s;
+  animation:cardPop 0.4s ease-out;
+  position:relative; overflow:hidden;
+}
+.metric-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+}
+.metric-card:hover {
+  border-color:rgba(0,255,200,0.3);
+  box-shadow:0 4px 30px rgba(0,255,200,0.08);
+  transform:translateY(-2px);
+}
+@keyframes cardPop {
+  from { opacity:0; transform:scale(0.96); }
+  to   { opacity:1; transform:scale(1); }
+}
+.metric-val {
+  font-family:'Space Mono',monospace;
+  font-size:1.8rem; font-weight:700;
+  color:var(--accent);
+  line-height:1;
+}
+.metric-lbl {
+  font-size:0.72rem; font-weight:600;
+  color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.12em;
+  margin-top:6px;
+}
+.metric-sub {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  margin-top:4px;
+}
+
+/* ── UPLOAD ZONE WRAPPER ── */
+.upload-zone-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+/* ── HM LAYOUT (hidden by default, shown as flex via JS) ── */
+.hm-layout-hidden { display: none; }
+.hm-layout-visible { display: flex; }
+
+/* ── GRID LAYOUTS ── */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.grid-3-2 { display:grid; grid-template-columns:3fr 2fr; gap:24px; }
+.grid-2-3 { display:grid; grid-template-columns:2fr 3fr; gap:24px; }
+
+/* ── CHART CARD ── */
+.chart-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:22px;
+  animation:fadeUp 0.5s ease-out;
+}
+.chart-card-title {
+  font-size:0.88rem; font-weight:700;
+  color:var(--muted2);
+  text-transform:uppercase; letter-spacing:0.1em;
+  margin-bottom:16px;
+  display:flex; align-items:center; gap:8px;
+}
+.chart-card-title::before {
+  content:'';
+  display:inline-block; width:6px; height:6px;
+  border-radius:50%; background:var(--accent);
+}
+
+/* ── BUTTONS ── */
+.btn-primary {
+  background:linear-gradient(135deg,#00ffc8,#00a8ff);
+  color:#070b14;
+  font-family:'Syne',sans-serif; font-weight:700;
+  font-size:0.88rem; padding:10px 28px;
+  border:none; border-radius:8px; cursor:pointer;
+  transition:all 0.25s;
+  text-transform:uppercase; letter-spacing:0.06em;
+}
+.btn-primary:hover {
+  transform:translateY(-2px);
+  box-shadow:0 6px 24px rgba(0,255,200,0.3);
+}
+.btn-primary:disabled {
+  background:var(--border2); color:var(--muted);
+  cursor:not-allowed; transform:none; box-shadow:none;
+}
+.btn-secondary {
+  background:var(--surface2);
+  color:var(--muted2);
+  border:1px solid var(--border2);
+  font-family:'Space Mono',monospace; font-size:10px;
+  padding:7px 14px; border-radius:6px; cursor:pointer;
+  transition:all 0.2s;
+  text-transform:uppercase; letter-spacing:0.08em;
+}
+.btn-secondary:hover, .btn-secondary.active {
+  border-color:var(--accent); color:var(--accent);
+  background:rgba(0,255,200,0.07);
+}
+
+/* ── CONTROLS ROW ── */
+.controls-row {
+  display:flex; align-items:center; flex-wrap:wrap;
+  gap:12px; margin-bottom:20px;
+}
+.ctrl-group {
+  display:flex; align-items:center; gap:8px;
+}
+.ctrl-label {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.12em;
+}
+select, input[type=range] {
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  color:var(--text);
+  font-family:'Space Mono',monospace;
+  font-size:11px; padding:7px 12px;
+  border-radius:7px; cursor:pointer;
+  outline:none; transition:border-color 0.2s;
+}
+select:hover, select:focus {
+  border-color:var(--accent);
+}
+input[type=range] {
+  padding:0; width:140px; accent-color:var(--accent);
+}
+
+/* ── HEATMAP ── */
+.heatmap-outer {
+  overflow:auto;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px;
+}
+.cell {
+  width:34px; height:34px;
+  border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Space Mono',monospace; font-size:7px; font-weight:500;
+  cursor:pointer;
+  transition:transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+}
+.cell:hover { transform:scale(1.35); z-index:20; box-shadow:0 4px 20px rgba(0,0,0,0.7); }
+.row-label {
+  font-family:'Space Mono',monospace; font-size:9px; color:var(--muted);
+  display:flex; align-items:center; justify-content:flex-end;
+  padding-right:8px; width:110px; height:34px; white-space:nowrap;
+}
+.col-label {
+  width:34px; height:90px;
+  font-family:'Space Mono',monospace; font-size:9px; color:var(--muted);
+  display:flex; justify-content:flex-start; align-items:flex-end;
+  padding-bottom:6px;
+  writing-mode:vertical-rl; text-orientation:mixed;
+  transform:rotate(180deg); white-space:nowrap;
+}
+.hm-sidebar { width:240px; flex-shrink:0; }
+.info-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px 18px;
+  margin-bottom:14px;
+  animation:fadeUp 0.4s ease-out;
+}
+.info-card h3 {
+  font-family:'Space Mono',monospace;
+  font-size:9px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.14em;
+  margin-bottom:10px;
+}
+.stat-row {
+  display:flex; justify-content:space-between;
+  padding:5px 0; border-bottom:1px solid var(--border);
+  font-family:'Space Mono',monospace; font-size:10px;
+}
+.stat-row:last-child { border-bottom:none; }
+.stat-label { color:var(--muted); }
+.pos { color:var(--positive); }
+.neg { color:var(--negative); }
+.pair-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:5px 0; border-bottom:1px solid var(--border);
+  font-family:'Space Mono',monospace; font-size:10px;
+}
+.pair-row:last-child { border-bottom:none; }
+.legend-bar {
+  height:10px; border-radius:5px;
+  background:linear-gradient(to right,#d32f2f,#1a2035,#0d47a1);
+  margin:8px 0 4px;
+}
+.legend-labels {
+  display:flex; justify-content:space-between;
+  font-family:'Space Mono',monospace; font-size:9px; color:var(--muted);
+}
+.tooltip-val {
+  font-family:'Space Mono',monospace;
+  font-size:2rem; font-weight:700; margin:6px 0;
+}
+
+/* ── CLUSTER ── */
+.scatter-canvas-wrap {
+  position:relative; width:100%; aspect-ratio:1.4/1;
+}
+#clusterChartCanvas { border-radius:10px; }
+
+/* ── MISSING TABLE ── */
+.missing-table {
+  width:100%; border-collapse:collapse;
+  font-family:'Space Mono',monospace; font-size:10px;
+}
+.missing-table th {
+  background:var(--surface2);
+  color:var(--muted); font-size:9px;
+  text-transform:uppercase; letter-spacing:0.1em;
+  padding:10px 14px; text-align:left;
+  border-bottom:1px solid var(--border);
+}
+.missing-table td {
+  padding:8px 14px;
+  border-bottom:1px solid var(--border);
+  color:var(--text);
+}
+.missing-table tr:hover td { background:var(--surface2); }
+.bar-wrap { background:var(--border); border-radius:3px; height:5px; width:80px; }
+.bar-fill { height:5px; border-radius:3px; transition:width 0.5s; }
+.badge {
+  padding:2px 8px; border-radius:10px;
+  font-size:9px; font-weight:700; text-transform:uppercase;
+}
+.badge-low { background:rgba(0,200,80,0.15); color:#00c850; }
+.badge-med { background:rgba(255,195,0,0.15); color:var(--warn); }
+.badge-high { background:rgba(255,95,133,0.15); color:var(--danger); }
+
+/* ── IMPUTATION RESULT TABLE ── */
+.preview-wrap {
+  max-height:360px; overflow:auto;
+  border:1px solid var(--border); border-radius:10px;
+  margin-top:12px;
+}
+.preview-table {
+  border-collapse:collapse; width:100%;
+  font-family:'Space Mono',monospace; font-size:10px;
+}
+.preview-table th {
+  background:var(--surface2); color:var(--muted);
+  padding:8px 12px; text-align:left; position:sticky; top:0;
+  font-size:9px; text-transform:uppercase; letter-spacing:0.08em;
+  border-bottom:1px solid var(--border);
+}
+.preview-table td {
+  padding:6px 12px; border-bottom:1px solid rgba(30,40,64,0.6);
+  color:var(--text);
+}
+.cell-imputed-mean    { background:rgba(255,195,0,0.12) !important; color:var(--warn) !important; }
+.cell-imputed-linear  { background:rgba(0,200,80,0.1) !important; color:#00c850 !important; }
+.cell-imputed-spline  { background:rgba(123,94,167,0.15) !important; color:#a070d0 !important; }
+.cell-original        {}
+
+/* ── SIGNAL CHART ── */
+.signal-canvas-wrap { position:relative; width:100%; height:200px; }
+
+/* ── PROGRESS ── */
+.progress-bar {
+  display:none; height:4px;
+  background:var(--border); border-radius:2px;
+  margin:16px 0; overflow:hidden;
+}
+.progress-fill {
+  height:100%; width:0%;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:2px; transition:width 0.3s;
+}
+
+/* ── INSIGHT BOX ── */
+.insight-box {
+  background:rgba(0,168,255,0.06);
+  border:1px solid rgba(0,168,255,0.2);
+  border-radius:10px; padding:14px 18px;
+  margin:12px 0;
+  font-family:'Space Mono',monospace; font-size:10px;
+  color:var(--muted2); line-height:1.8;
+}
+.insight-box.warn { border-color:rgba(255,195,0,0.25); background:rgba(255,195,0,0.05); color:var(--warn); }
+.insight-box.success { border-color:rgba(0,200,80,0.25); background:rgba(0,200,80,0.05); color:#00c850; }
+
+/* ── DOWNLOAD BTN ── */
+.download-btn {
+  background:transparent;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  font-family:'Space Mono',monospace; font-size:10px;
+  padding:7px 18px; border-radius:7px; cursor:pointer;
+  transition:all 0.2s; text-transform:uppercase;
+}
+.download-btn:hover {
+  background:rgba(0,255,200,0.1);
+}
+
+/* ── RESULT STATS ROW ── */
+.result-stat {
+  display:inline-flex; gap:6px;
+  font-family:'Space Mono',monospace; font-size:10px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:6px; padding:6px 12px; margin:4px;
+}
+.result-stat span { color:var(--muted); }
+
+/* ── CORR BAR ── */
+.corr-bar-row {
+  padding:8px 10px; margin:4px 0;
+  background:var(--surface2); border-radius:8px;
+  border-left:3px solid var(--accent);
+  font-family:'Space Mono',monospace;
+}
+.corr-bar-header {
+  display:flex; justify-content:space-between;
+  font-size:10px; color:var(--muted2); margin-bottom:5px;
+}
+.corr-bar-bg { background:var(--border); border-radius:3px; height:4px; }
+.corr-bar-fill { height:4px; border-radius:3px; transition:width 0.5s; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  border:1px dashed var(--border2);
+  border-radius:12px;
+  padding:48px; text-align:center;
+  color:var(--muted);
+  font-family:'Space Mono',monospace; font-size:10px;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:var(--surface); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--muted); }
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px) {
+  .sidebar { transform:translateX(-100%); }
+  .main { margin-left:0; }
+  .grid-2, .grid-3-2, .grid-2-3 { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-tag"><span class="logo-dot"></span>Live Analytics</div>
+    <div class="logo-name">AirSense Pro</div>
+    <div class="logo-sub">Pollution Intelligence Platform</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Data</div>
+    <div class="nav-item active" onclick="switchPage('upload')">
+      <span class="nav-icon">📂</span> Data Upload
+    </div>
+
+    <div class="nav-divider"></div>
+    <div class="nav-label">Analysis</div>
+    <div class="nav-item" onclick="switchPage('overview')">
+      <span class="nav-icon">📊</span> Overview
+    </div>
+    <div class="nav-item" onclick="switchPage('impute')">
+      <span class="nav-icon">🛠️</span> Data Imputation
+    </div>
+    <div class="nav-item" onclick="switchPage('graphcheck')">
+      <span class="nav-icon">📈</span> Graph Check
+    </div>
+    <div class="nav-item" onclick="switchPage('heatmap')">
+      <span class="nav-icon">🌡️</span> Correlation Heatmap
+    </div>
+    <div class="nav-item" onclick="switchPage('cluster')">
+      <span class="nav-icon">🔗</span> Cluster Analysis
+    </div>
+    <div class="nav-item" onclick="switchPage('signal')">
+      <span class="nav-icon">📡</span> Signal Reconstruction
+    </div>
+    <div class="nav-item" onclick="switchPage('pollutionalert')">
+      <span class="nav-icon">🚨</span> Pollution Alert
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    AirSense Pro v2.0<br>
+    Upload city_day.csv to begin<br>
+    All processing is client-side
+  </div>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+
+  <!-- ── TOP BAR ── -->
+  <div class="topbar">
+    <div>
+      <div class="page-hero-title" id="pageTitle">Data Upload</div>
+      <div class="page-hero-sub" id="pageSubtitle">● Upload your CSV to unlock all modules</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══════════ UPLOAD PAGE ══════════ -->
+    <div class="page-panel active" id="page-upload">
+      <div class="sec-title">Upload Dataset</div>
+      <div class="upload-zone-wrap">
+        <label class="upload-zone" id="uploadZone">
+          <input type="file" id="csvFile" accept=".csv">
+          <div class="upload-icon">📅</div>
+          <div class="upload-title">city_day.csv</div>
+          <div class="upload-hint">Drag &amp; drop or click to browse · CSV with City, Date, pollutant columns</div>
+          <div class="upload-cta">Browse File</div>
+          <div class="upload-status" id="uploadStatus">or drag &amp; drop here</div>
+        </label>
+      </div>
+      <div id="uploadMetrics" style="display:none">
+        <div class="sec-title">Dataset Summary</div>
+        <div class="metrics-row" id="summaryMetrics"></div>
+        <div class="insight-box">
+          <strong>✅ Dataset loaded.</strong> Navigate using the sidebar to explore correlations, clustering, imputation, and signal reconstruction.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ OVERVIEW PAGE ══════════ -->
+    <div class="page-panel" id="page-overview">
+      <div id="overviewContent">
+        <div class="empty-state">Upload a CSV first to see the overview.</div>
+      </div>
+    </div>
+
+    <!-- ══════════ GRAPH CHECK PAGE ══════════ -->
+    <div class="page-panel" id="page-graphcheck">
+      <div id="gcEmpty" class="empty-state">Upload a CSV to explore dataset graphs.</div>
+      <div id="gcLayout" style="display:none">
+
+        <!-- HOW GRAPH CHECK WORKS -->
+        <div class="info-card" style="margin-bottom:20px">
+          <h3>How Graph Check Works</h3>
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted2);line-height:2;margin-top:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-top:8px">
+              <div style="border-left:3px solid var(--accent);padding-left:10px">
+                <div style="color:var(--accent);font-weight:700;margin-bottom:4px">① Select Axes</div>
+                Choose any two pollutant columns as X and Y axes. Optionally filter by a specific city to see city-level trends.
+              </div>
+              <div style="border-left:3px solid var(--accent2);padding-left:10px">
+                <div style="color:var(--accent2);font-weight:700;margin-bottom:4px">② Choose Chart Type</div>
+                <b style="color:var(--text)">Line</b> — shows temporal trend of Y values. <b style="color:var(--text)">Bar</b> — compares magnitudes per row index. <b style="color:var(--text)">Scatter</b> — plots X vs Y directly to reveal correlation.
+              </div>
+              <div style="border-left:3px solid var(--warn);padding-left:10px">
+                <div style="color:var(--warn);font-weight:700;margin-bottom:4px">③ Distribution Check</div>
+                The right panel shows a histogram of all Y values, split into 20 equal buckets. This reveals data skew, outliers, and whether the column follows a normal distribution.
+              </div>
+              <div style="border-left:3px solid var(--danger);padding-left:10px">
+                <div style="color:var(--danger);font-weight:700;margin-bottom:4px">④ Stats &amp; Missing</div>
+                The table below reports Min, Max, Mean and Std Dev for every numeric column, alongside missing value counts — helping you decide which columns need imputation.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <div class="ctrl-group">
+            <span class="ctrl-label">Pollutant</span>
+            <select id="gcY"></select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">Chart Type</span>
+            <select id="gcType">
+              <option value="line">Line (by City)</option>
+              <option value="bar">Bar (City Means)</option>
+              <option value="scatter">Scatter (City vs City)</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">City Filter</span>
+            <select id="gcCity"><option value="ALL">All Cities</option></select>
+          </div>
+          <button class="btn-primary" id="runGcBtn" onclick="runGraphCheck()" disabled>Plot Graph</button>
+        </div>
+
+        <div class="grid-2" style="margin-top:0">
+          <div class="chart-card">
+            <div class="chart-card-title" id="gcChartTitle">Dataset Plot</div>
+            <div style="position:relative;width:100%;height:260px">
+              <canvas id="gcMainCanvas"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Value Distribution (Y)</div>
+            <div style="position:relative;width:100%;height:260px">
+              <canvas id="gcDistCanvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-title">Column Statistics</div>
+        <div class="metrics-row" id="gcStats"></div>
+
+        <div class="sec-title">Missing Value Check</div>
+        <div class="chart-card" style="overflow-x:auto">
+          <table class="missing-table" id="gcMissingTable">
+            <thead><tr>
+              <th>Column</th><th>Total</th><th>Missing</th><th>% Missing</th>
+              <th>Min</th><th>Max</th><th>Mean</th><th>Std Dev</th>
+            </tr></thead>
+            <tbody id="gcMissingBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ HEATMAP PAGE ══════════ -->
+    <div class="page-panel" id="page-heatmap">
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <span class="ctrl-label">Pollutant</span>
+          <select id="hmPollutant"></select>
+        </div>
+        <button class="btn-primary" id="genHeatmapBtn" onclick="generateHeatmap()" disabled>Generate Heatmap</button>
+        <button class="btn-secondary" onclick="setHmSort('alpha',this)">A–Z Sort</button>
+        <button class="btn-secondary" onclick="toggleHmValues(this)">Hide Values</button>
+        <button class="btn-secondary" onclick="highlightStrong()">Strong Only |r|≥0.6</button>
+        <button class="btn-secondary" onclick="highlightNegative()">Negative Only</button>
+        <button class="btn-secondary" onclick="resetHighlight()">Show All</button>
+      </div>
+
+      <div id="hmEmpty" class="empty-state">Upload a CSV and click Generate Heatmap.</div>
+
+      <div id="hmLayout" class="hm-layout-hidden" style="gap:24px; align-items:flex-start; flex-wrap:wrap;">
+        <div class="heatmap-outer" style="flex:1; min-width:0">
+          <div id="heatmapContainer"></div>
+        </div>
+        <div class="hm-sidebar">
+          <div class="info-card">
+            <h3>Selected Cell</h3>
+            <div id="tooltipBox"><div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">Hover a cell to see details</div></div>
+          </div>
+          <div class="info-card">
+            <h3>Color Scale</h3>
+            <div class="legend-bar"></div>
+            <div class="legend-labels"><span>−1.0</span><span>−0.5</span><span>0</span><span>+0.5</span><span>+1.0</span></div>
+            <div style="margin-top:10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);line-height:1.9">
+              🔴 Red → Strong Negative<br>⚫ Dark → Near Zero<br>🔵 Blue → Strong Positive
+            </div>
+          </div>
+          <div class="info-card">
+            <h3>Statistics</h3>
+            <div id="statsBox"></div>
+          </div>
+          <div class="info-card">
+            <h3>Top Positive Pairs</h3>
+            <div id="topPosBox"></div>
+          </div>
+          <div class="info-card">
+            <h3>Top Negative Pairs</h3>
+            <div id="topNegBox"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ CLUSTER PAGE ══════════ -->
+    <div class="page-panel" id="page-cluster">
+
+      <!-- HOW CLUSTER ANALYSIS WORKS -->
+      <div class="info-card" style="margin-bottom:20px">
+        <h3>How Cluster Analysis Works</h3>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted2);line-height:2;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-top:8px">
+            <div style="border-left:3px solid var(--accent);padding-left:10px">
+              <div style="color:var(--accent);font-weight:700;margin-bottom:4px">① Select Axes & K</div>
+              Pick two pollutant columns as X and Y, then choose K (number of clusters). Each city-day row becomes a 2D point in pollutant space. K controls how many groups the algorithm will find.
+            </div>
+            <div style="border-left:3px solid var(--accent2);padding-left:10px">
+              <div style="color:var(--accent2);font-weight:700;margin-bottom:4px">② K-Means Algorithm</div>
+              K centroids are initialised from the first K points. Every point is assigned to its nearest centroid (Euclidean distance). Centroids are recomputed as the mean of assigned points. This repeats until assignments stop changing (convergence).
+            </div>
+            <div style="border-left:3px solid var(--warn);padding-left:10px">
+              <div style="color:var(--warn);font-weight:700;margin-bottom:4px">③ Read the Scatter Plot</div>
+              Each colour represents one cluster. Tight, well-separated clusters indicate distinct pollution regimes (e.g. low-pollution days vs severe days). Overlapping clusters suggest the two pollutants alone don't fully separate the regimes.
+            </div>
+            <div style="border-left:3px solid var(--danger);padding-left:10px">
+              <div style="color:var(--danger);font-weight:700;margin-bottom:4px">④ Profile Bars</div>
+              The bar chart shows the mean of the top 5 pollutant columns per cluster, letting you characterise each cluster (e.g. Cluster 1 = high PM2.5 + high NO2 = traffic-heavy days). The doughnut shows relative cluster sizes.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <span class="ctrl-label">Pollutant</span>
+          <select id="clPollutant"></select>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">K clusters</span>
+          <select id="clK">
+            <option>2</option><option selected>3</option>
+            <option>4</option><option>5</option><option>6</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="runClusterBtn" onclick="runClustering()" disabled>Run Clustering</button>
+      </div>
+
+      <div id="clEmpty" class="empty-state">Upload a CSV and configure parameters.</div>
+
+      <div id="clLayout" style="display:none">
+        <div class="grid-3-2" style="margin-top:0">
+          <div class="chart-card">
+            <div class="chart-card-title" id="clScatterTitle">Scatter — City Pollution Clusters</div>
+            <div class="scatter-canvas-wrap">
+              <canvas id="clusterChartCanvas"></canvas>
+            </div>
+          </div>
+          <div>
+            <div class="chart-card" style="margin-bottom:16px">
+              <div class="chart-card-title">Cluster Sizes</div>
+              <canvas id="clusterPieCanvas" height="160"></canvas>
+            </div>
+            <div class="info-card" id="clusterSummaryCard">
+              <h3>Cluster Centroids (City Means)</h3>
+              <div id="clusterCentroids" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);line-height:1.9"></div>
+            </div>
+          </div>
+        </div>
+        <div class="sec-title">Cluster Profile Bars</div>
+        <div class="chart-card">
+          <canvas id="clusterBarCanvas" height="80"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ SIGNAL RECONSTRUCTION PAGE ══════════ -->
+    <div class="page-panel" id="page-signal">
+
+      <!-- HOW IT WORKS EXPLANATION -->
+      <div class="info-card" style="margin-bottom:20px">
+        <h3>How Signal Reconstruction Works</h3>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted2);line-height:2;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px">
+            <div style="border-left:3px solid var(--accent);padding-left:10px">
+              <div style="color:var(--accent);font-weight:700;margin-bottom:4px">① Corrupt the Signal</div>
+              A percentage of known values are randomly removed from the pollutant time-series to simulate missing data gaps. These "missing" points are tracked so we can measure reconstruction accuracy.
+            </div>
+            <div style="border-left:3px solid var(--accent2);padding-left:10px">
+              <div style="color:var(--accent2);font-weight:700;margin-bottom:4px">② DCT Reconstruction</div>
+              The corrupted signal is filled with the column mean, then transformed into the frequency domain using a Discrete Cosine Transform (DCT). Only the N lowest-frequency coefficients are kept — high-frequency noise is discarded — then the signal is reconstructed via Inverse DCT (IDCT).
+            </div>
+            <div style="border-left:3px solid var(--warn);padding-left:10px">
+              <div style="color:var(--warn);font-weight:700;margin-bottom:4px">③ Evaluate Accuracy</div>
+              MSE (Mean Squared Error) and Error Std Dev are computed only at the randomly removed positions. MSE penalises large errors more heavily and gives a clear picture of overall reconstruction quality. Std Dev measures how consistently the reconstruction performs — a low Std Dev means errors are uniformly small, while a high value reveals localised failure zones visible in the error chart.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <span class="ctrl-label">City</span>
+          <select id="sigCity"></select>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Pollutant</span>
+          <select id="sigPollutant"></select>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Missing %</span>
+          <input type="range" id="sigMissing" min="5" max="50" value="20">
+          <span id="sigMissingVal" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);width:30px">20%</span>
+        </div>
+        <div class="ctrl-group">
+          <span class="ctrl-label">DCT Coeffs</span>
+          <input type="range" id="sigCoeffs" min="10" max="300" value="80">
+          <span id="sigCoeffsVal" style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);width:30px">80</span>
+        </div>
+        <button class="btn-primary" id="runSignalBtn" onclick="runSignal()" disabled>Reconstruct</button>
+      </div>
+
+      <div id="sigEmpty" class="empty-state">Upload a CSV and click Reconstruct.</div>
+      <div id="sigLayout" style="display:none">
+        <div class="metrics-row" id="sigMetrics"></div>
+        <div class="chart-card" style="margin-top:16px">
+          <div class="chart-card-title">Original vs Corrupted Signal</div>
+          <div class="signal-canvas-wrap"><canvas id="sigChart1"></canvas></div>
+        </div>
+        <div class="grid-2" style="margin-top:16px">
+          <div class="chart-card">
+            <div class="chart-card-title">DCT Reconstruction</div>
+            <div class="signal-canvas-wrap"><canvas id="sigChart2"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Reconstruction Error per Point</div>
+            <div class="signal-canvas-wrap"><canvas id="sigChart3"></canvas></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════ IMPUTATION PAGE ══════════ -->
+    <div class="page-panel" id="page-impute">
+      <div id="imputeEmpty" class="empty-state">Upload a CSV to run imputation.</div>
+      <div id="imputeLayout" style="display:none">
+        <div class="sec-title">Missing Data Summary</div>
+        <div class="chart-card" style="overflow-x:auto">
+          <table class="missing-table">
+            <thead>
+              <tr>
+                <th>Column</th><th>Total</th><th>Missing</th><th>% Missing</th>
+                <th>Distribution</th><th>Severity</th>
+              </tr>
+            </thead>
+            <tbody id="missingBody"></tbody>
+          </table>
+        </div>
+
+        <div class="sec-title">Imputation Settings</div>
+        <div class="controls-row">
+          <div class="ctrl-group">
+            <span class="ctrl-label">City</span>
+            <select id="impCity"><option value="ALL">All Cities</option></select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">Column</span>
+            <select id="impCol"><option value="ALL">All Numeric</option></select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">Method</span>
+            <select id="impMethod" onchange="updateMethodInfo()">
+              <option value="mean">Mean (per city)</option>
+              <option value="linear">Linear Interpolation</option>
+              <option value="spline">Cubic Spline</option>
+              <option value="both">Linear + Mean (full coverage)</option>
+              <option value="spline_mean">Spline + Mean (full coverage)</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="runImpBtn" onclick="runImputation()">Run Imputation →</button>
+        </div>
+
+        <div class="insight-box" id="methodInfo">
+          <strong>Mean Imputation:</strong> Replace missing values with city-level column average. Simple, fast, does not preserve trends.
+        </div>
+
+        <div class="progress-bar" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div id="resultsSection" style="display:none">
+          <div class="sec-title">Imputed Data Preview</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+            <div id="resultStats"></div>
+            <button class="download-btn" onclick="downloadCSV()">⬇ Download Imputed CSV</button>
+          </div>
+          <div style="margin-bottom:8px;font-family:'Space Mono',monospace;font-size:9px;color:var(--muted)">
+            <span style="display:inline-block;width:10px;height:10px;background:rgba(255,195,0,0.4);border-radius:2px;margin-right:4px"></span>Mean
+            <span style="display:inline-block;width:10px;height:10px;background:rgba(0,200,80,0.3);border-radius:2px;margin:0 4px 0 10px"></span>Linear
+            <span style="display:inline-block;width:10px;height:10px;background:rgba(123,94,167,0.3);border-radius:2px;margin:0 4px 0 10px"></span>Spline
+          </div>
+          <div class="preview-wrap">
+            <table class="preview-table" id="previewTable"></table>
+          </div>
+          <p style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);margin-top:8px">
+            Showing first 200 rows. Download for full dataset.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+    <!-- ══════════ POLLUTION ALERT PAGE ══════════ -->
+    <div class="page-panel" id="page-pollutionalert">
+      <div id="paEmpty" class="empty-state">Upload a CSV to view Pollution Alert Rankings.</div>
+      <div id="paLayout" style="display:none">
+
+        <!-- CONTROLS -->
+        <div class="controls-row" style="margin-bottom:16px">
+          <div class="ctrl-group">
+            <span class="ctrl-label">Metric</span>
+            <select id="paMetric" onchange="buildPollutionAlert()">
+              <option value="mean">Mean (avg across all dates)</option>
+              <option value="max">Peak (max recorded value)</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">Highlight Threshold</span>
+            <select id="paThreshold" onchange="buildPollutionAlert()">
+              <option value="0.6">Top 40% — Moderate+</option>
+              <option value="0.75" selected>Top 25% — High</option>
+              <option value="0.9">Top 10% — Critical</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- SUMMARY BADGES -->
+        <div id="paBadges" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px"></div>
+
+        <!-- RADAR CHART ROW -->
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-card-title" id="paRadarTitle">Pollutant Profile — Top Polluted Cities</div>
+            <div style="position:relative;width:100%;height:320px">
+              <canvas id="paRadarCanvas"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-title">Overall Pollution Score per City</div>
+            <div style="position:relative;width:100%;height:320px">
+              <canvas id="paScoreCanvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- CITY DETAIL HEATMAP TABLE -->
+        <div class="sec-title">City × Pollutant Heatmap</div>
+        <div class="chart-card" style="overflow-x:auto">
+          <div id="paCityTable"></div>
+        </div>
+
+      </div>
+    </div>
+
+
+</main>
+</div><!-- /shell -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// GLOBAL STATE
+// ══════════════════════════════════════════════════════════════════
+let rawData = [], headers = [], numericCols = [];
+const EXCLUDE_COLS = ['City','Date','AQI_Bucket','AQI'];
+
+// Heatmap state
+let hmCities = [], hmCorrMatrix = [], hmCityOrder = [], hmShowValues = true;
+
+// Imputation state
+let imputedData = [], imputedFlags = [];
+
+// Charts
+let clusterChart = null, clusterPieChart = null, clusterBarChart = null;
+let sigChart1 = null, sigChart2 = null, sigChart3 = null;
+
+// Chart.js global defaults
+Chart.defaults.color = '#5a6a90';
+Chart.defaults.borderColor = '#1e2840';
+Chart.defaults.font.family = "'Space Mono', monospace";
+
+const PALETTE = ['#00ffc8','#ff5f85','#ffc300','#00a8ff','#7b5ea7','#ff7c43','#56cfe1','#72efdd'];
+
+// ── Page titles
+const PAGE_META = {
+  upload:          ['Data Upload',            '● Upload your CSV to unlock all modules'],
+  overview:        ['Dataset Overview',       '● Summary statistics and distributions'],
+  impute:          ['Data Imputation',        '● Fill missing values with statistical methods'],
+  graphcheck:      ['Graph Check',            '● Visualize and inspect dataset columns'],
+  heatmap:         ['Correlation Heatmap',    '● Inter-city Pearson r by pollutant'],
+  cluster:         ['Cluster Analysis',       '● K-Means pollution profile segmentation'],
+  signal:          ['Signal Reconstruction',  '● DCT-based missing data recovery'],
+  pollutionalert:  ['Pollution Alert',        '● City pollution rankings with severity indicators'],
+};
+
+function switchPage(id) {
+  document.querySelectorAll('.page-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelector(`.nav-item[onclick="switchPage('${id}')"]`).classList.add('active');
+  const [title, sub] = PAGE_META[id];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageSubtitle').textContent = sub;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FILE UPLOAD
+// ══════════════════════════════════════════════════════════════════
+const uz    = document.getElementById('uploadZone');
+const uInp  = document.getElementById('csvFile');
+const uStat = document.getElementById('uploadStatus');
+
+uInp.addEventListener('change', e => { if(e.target.files[0]) parseCSV(e.target.files[0]); });
+uz.addEventListener('dragover',  e => { e.preventDefault(); uz.classList.add('dragover'); });
+uz.addEventListener('dragleave', ()=> uz.classList.remove('dragover'));
+uz.addEventListener('drop', e => {
+  e.preventDefault(); uz.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) parseCSV(e.dataTransfer.files[0]);
+});
+
+function parseCSV(file) {
+  uStat.style.color = '#ffc300';
+  uStat.textContent = '⏳ Parsing ' + file.name + '…';
+  Papa.parse(file, {
+    header: true, dynamicTyping: false, skipEmptyLines: true,
+    complete(results) {
+      rawData  = results.data;
+      headers  = results.meta.fields;
+      numericCols = headers.filter(h => !EXCLUDE_COLS.includes(h));
+
+      uz.classList.add('loaded');
+      uStat.style.color = '#00c850';
+      uStat.textContent = `✓ ${file.name} · ${rawData.length.toLocaleString()} rows · ${headers.length} cols`;
+
+      onDataLoaded();
+    },
+    error(err) {
+      uStat.style.color = '#ff5f85';
+      uStat.textContent = '❌ ' + err.message;
+    }
+  });
+}
+
+function onDataLoaded() {
+  buildUploadSummary();
+  buildHeatmapControls();
+  buildClusterControls();
+  buildSignalControls();
+  buildImputeUI();
+  buildOverview();
+  buildGraphCheck();
+  buildPollutionAlert();
+
+  // Enable buttons
+  document.getElementById('genHeatmapBtn').disabled = false;
+  document.getElementById('runClusterBtn').disabled = false;
+  document.getElementById('runSignalBtn').disabled = false;
+  document.getElementById('runGcBtn').disabled = false;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UPLOAD SUMMARY
+// ══════════════════════════════════════════════════════════════════
+function buildUploadSummary() {
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean);
+  const dates  = [...new Set(rawData.map(r=>r.Date))].filter(Boolean);
+  let totalMissing = 0;
+  numericCols.forEach(c => {
+    totalMissing += rawData.filter(r => isMissing(r[c])).length;
+  });
+
+  const items = [
+    [rawData.length.toLocaleString(), 'Total Rows', ''],
+    [cities.length, 'Cities', cities.slice(0,3).join(', ')+'…'],
+    [dates.length.toLocaleString(), 'Date Records', ''],
+    [numericCols.length, 'Pollutant Cols', numericCols.join(', ').slice(0,40)+'…'],
+    [totalMissing.toLocaleString(), 'Missing Cells', ((totalMissing/(rawData.length*numericCols.length))*100).toFixed(1)+'% of dataset'],
+  ];
+
+  document.getElementById('summaryMetrics').innerHTML = items.map(([v,l,s]) => `
+    <div class="metric-card">
+      <div class="metric-val">${v}</div>
+      <div class="metric-lbl">${l}</div>
+      ${s?`<div class="metric-sub">${s}</div>`:''}
+    </div>
+  `).join('');
+  document.getElementById('uploadMetrics').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════════════════════
+function buildOverview() {
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+
+  // Compute city-level means per pollutant
+  const cityMeans = {};
+  cities.forEach(city => {
+    const rows = rawData.filter(r=>r.City===city);
+    cityMeans[city] = {};
+    numericCols.forEach(col => {
+      const vals = rows.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+      cityMeans[city][col] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    });
+  });
+
+  const firstCols = numericCols.slice(0,4);
+
+  const overviewHtml = `
+    <div class="metrics-row" style="flex-wrap:wrap; gap:10px">
+      ${numericCols.map(col => {
+        const allVals = rawData.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+        const mean = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(2) : '—';
+        const max  = allVals.length ? Math.max(...allVals).toFixed(2) : '—';
+        return `<div class="metric-card" style="min-width:140px;flex:1">
+          <div class="metric-val">${mean}</div>
+          <div class="metric-lbl">Avg ${col}</div>
+          <div class="metric-sub">Peak: ${max}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="chart-card">
+        <div class="chart-card-title">City Mean Comparison (${firstCols[0]||'PM2.5'})</div>
+        <canvas id="ovBarCanvas" height="160"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">Pollutant Distribution (all cities)</div>
+        <canvas id="ovDistCanvas" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- POLLUTANT TREND SECTION -->
+    <div class="sec-title" style="margin-top:24px">Pollutant Trend Over Time</div>
+    <div class="chart-card" style="margin-top:0">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:14px">
+        <div class="ctrl-group" style="margin:0">
+          <span class="ctrl-label">City</span>
+          <select id="trendCity" onchange="renderTrendChart()" style="background:var(--card2);color:var(--text);border:1px solid #1e2840;border-radius:6px;padding:5px 10px;font-size:11px">
+            ${cities.map(c=>`<option value="${c}">${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ctrl-group" style="margin:0">
+          <span class="ctrl-label">Pollutants</span>
+          <div id="trendPollutantToggles" style="display:flex;flex-wrap:wrap;gap:6px">
+            ${numericCols.map((col,i)=>`
+              <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-family:'Space Mono',monospace;font-size:9px;color:var(--muted2)">
+                <input type="checkbox" class="trend-col-chk" value="${col}" ${i<4?'checked':''} onchange="renderTrendChart()" style="accent-color:${PALETTE[i%PALETTE.length]}">
+                <span style="color:${PALETTE[i%PALETTE.length]}">${col}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+        <div class="ctrl-group" style="margin:0">
+          <span class="ctrl-label">From</span>
+          <input type="date" id="trendFrom" onchange="renderTrendChart()" style="background:var(--card2);color:var(--text);border:1px solid #1e2840;border-radius:6px;padding:5px 8px;font-size:11px">
+        </div>
+        <div class="ctrl-group" style="margin:0">
+          <span class="ctrl-label">To</span>
+          <input type="date" id="trendTo" onchange="renderTrendChart()" style="background:var(--card2);color:var(--text);border:1px solid #1e2840;border-radius:6px;padding:5px 8px;font-size:11px">
+        </div>
+        <button class="btn-secondary" onclick="resetTrendDates()" style="margin:0">Reset Dates</button>
+      </div>
+      <div style="position:relative;width:100%;height:280px">
+        <canvas id="trendCanvas"></canvas>
+      </div>
+    </div>
+  `;
+  document.getElementById('overviewContent').innerHTML = overviewHtml;
+
+  // City bar chart
+  const col0 = firstCols[0] || numericCols[0];
+  const cityLabels = cities;
+  const cityData   = cities.map(c => +cityMeans[c][col0].toFixed(2));
+  new Chart(document.getElementById('ovBarCanvas'), {
+    type:'bar',
+    data:{
+      labels:cityLabels,
+      datasets:[{
+        label: col0,
+        data: cityData,
+        backgroundColor: PALETTE,
+        borderRadius:4,
+      }]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{maxRotation:45,font:{size:9}}, grid:{color:'#1e2840'}},
+        y:{grid:{color:'#1e2840'}, ticks:{font:{size:9}}}
+      }
+    }
+  });
+
+  // Distribution chart
+  const distCol = firstCols[1] || numericCols[0];
+  const allVals = rawData.map(r=>parseFloat(r[distCol])).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+  const buckets = 30;
+  const dMin = allVals[0], dMax = allVals[allVals.length-1];
+  const dStep = (dMax-dMin)/buckets;
+  const hist = Array(buckets).fill(0);
+  allVals.forEach(v => { const b=Math.min(Math.floor((v-dMin)/dStep),buckets-1); hist[b]++; });
+  new Chart(document.getElementById('ovDistCanvas'), {
+    type:'bar',
+    data:{
+      labels: hist.map((_,i)=>(dMin+i*dStep).toFixed(1)),
+      datasets:[{ label:distCol, data:hist,
+        backgroundColor:'rgba(0,255,200,0.4)', borderColor:'rgba(0,255,200,0.7)',
+        borderWidth:1, borderRadius:2 }]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{maxRotation:60,font:{size:8},maxTicksLimit:10}, grid:{color:'#1e2840'}},
+        y:{grid:{color:'#1e2840'}, ticks:{font:{size:9}}}
+      }
+    }
+  });
+
+  // Set date range defaults from data
+  const allDates = [...new Set(rawData.map(r=>r.Date))].filter(Boolean).sort();
+  if(allDates.length) {
+    document.getElementById('trendFrom').value = allDates[0];
+    document.getElementById('trendTo').value   = allDates[allDates.length-1];
+  }
+
+  // Initial trend render
+  renderTrendChart();
+}
+
+let trendChart = null;
+function renderTrendChart() {
+  const city    = document.getElementById('trendCity').value;
+  const fromVal = document.getElementById('trendFrom').value;
+  const toVal   = document.getElementById('trendTo').value;
+  const checked = [...document.querySelectorAll('.trend-col-chk:checked')].map(el=>el.value);
+  if(!checked.length) return;
+
+  // Filter rows by city and date range
+  let rows = rawData.filter(r=>r.City===city && r.Date);
+  if(fromVal) rows = rows.filter(r=>r.Date>=fromVal);
+  if(toVal)   rows = rows.filter(r=>r.Date<=toVal);
+  rows.sort((a,b)=>a.Date.localeCompare(b.Date));
+
+  const dates = rows.map(r=>r.Date);
+
+  const datasets = checked.map((col,i) => {
+    const colIdx = numericCols.indexOf(col);
+    return {
+      label: col,
+      data: rows.map(r=>{ const v=parseFloat(r[col]); return isNaN(v)?null:v; }),
+      borderColor: PALETTE[colIdx%PALETTE.length],
+      backgroundColor: PALETTE[colIdx%PALETTE.length]+'22',
+      borderWidth: 1.8,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true
+    };
+  });
+
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendCanvas'), {
+    type:'line',
+    data:{ labels:dates, datasets },
+    options:{
+      animation:{ duration:300 },
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ labels:{ font:{size:9}, boxWidth:10, color:'#a0b4d0' } },
+        tooltip:{
+          backgroundColor:'rgba(10,18,40,0.95)',
+          titleFont:{size:10}, bodyFont:{size:9},
+          callbacks:{
+            title: ctx => ctx[0].label,
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y!==null?ctx.parsed.y.toFixed(2):'—'}`
+          }
+        }
+      },
+      scales:{
+        x:{
+          grid:{ color:'#1e2840' },
+          ticks:{ font:{size:8}, maxTicksLimit:12, maxRotation:30, color:'#5a6a90' }
+        },
+        y:{
+          grid:{ color:'#1e2840' },
+          ticks:{ font:{size:9}, color:'#5a6a90' },
+          title:{ display:true, text:'Concentration', font:{size:9}, color:'#5a6a90' }
+        }
+      }
+    }
+  });
+}
+
+function resetTrendDates() {
+  const allDates = [...new Set(rawData.map(r=>r.Date))].filter(Boolean).sort();
+  if(allDates.length) {
+    document.getElementById('trendFrom').value = allDates[0];
+    document.getElementById('trendTo').value   = allDates[allDates.length-1];
+    renderTrendChart();
+  }
+}
+// ══════════════════════════════════════════════════════════════════
+// HEATMAP
+// ══════════════════════════════════════════════════════════════════
+function buildHeatmapControls() {
+  const sel = document.getElementById('hmPollutant');
+  sel.innerHTML = numericCols.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+function pearsonCorr(a,b) {
+  const n = a.length;
+  if(n<2) return null;
+  const meanA = a.reduce((s,v)=>s+v,0)/n, meanB = b.reduce((s,v)=>s+v,0)/n;
+  let num=0, da=0, db=0;
+  for(let i=0;i<n;i++){
+    const dA=a[i]-meanA, dB=b[i]-meanB;
+    num+=dA*dB; da+=dA*dA; db+=dB*dB;
+  }
+  if(da===0||db===0) return null;
+  return num/Math.sqrt(da*db);
+}
+
+function buildHmMatrix(col) {
+  const cityMap = {};
+  rawData.forEach(row => {
+    const c = row.City, d = row.Date, v = parseFloat(row[col]);
+    if(!c||!d||isNaN(v)) return;
+    if(!cityMap[c]) cityMap[c] = {};
+    cityMap[c][d] = v;
+  });
+  const cityList = Object.keys(cityMap).sort();
+  const n = cityList.length;
+  const corr = Array.from({length:n}, () => Array(n).fill(0));
+  for(let i=0;i<n;i++){
+    corr[i][i]=1;
+    for(let j=i+1;j<n;j++){
+      const dA = cityMap[cityList[i]], dB = cityMap[cityList[j]];
+      const common = Object.keys(dA).filter(d=>dB[d]!==undefined);
+      if(!common.length){corr[i][j]=corr[j][i]=0; continue;}
+      const vA=common.map(d=>dA[d]), vB=common.map(d=>dB[d]);
+      const r = pearsonCorr(vA,vB);
+      const rv = r===null?0:parseFloat(r.toFixed(4));
+      corr[i][j]=rv; corr[j][i]=rv;
+    }
+  }
+  return {cityList, corr};
+}
+
+function generateHeatmap() {
+  const col = document.getElementById('hmPollutant').value;
+  document.getElementById('heatmapContainer').innerHTML =
+    '<div style="padding:40px;text-align:center;font-family:Space Mono,monospace;font-size:11px;color:var(--muted)">⏳ Computing correlations…</div>';
+  document.getElementById('hmEmpty').style.display='none';
+  document.getElementById('hmLayout').classList.remove('hm-layout-hidden');
+  document.getElementById('hmLayout').classList.add('hm-layout-visible');
+
+  setTimeout(()=>{
+    try {
+      const {cityList,corr} = buildHmMatrix(col);
+      hmCities = cityList; hmCorrMatrix = corr; hmShowValues = true;
+      hmCityOrder = cityList.map((_,i)=>i).sort((a,b)=>hmCities[a].localeCompare(hmCities[b]));
+      renderHeatmap();
+    } catch(e) {
+      document.getElementById('heatmapContainer').innerHTML = `<div style="padding:40px;color:var(--danger)">❌ ${e.message}</div>`;
+    }
+  },50);
+}
+
+function hmColor(v) {
+  if(v>=0) return `rgb(${Math.round(13*(1-v)+13*v)},${Math.round(18*(1-v)+69*v)},${Math.round(32*(1-v)+161*v)})`;
+  const t=-v; return `rgb(${Math.round(13+198*t)},${Math.round(18-6*t)},${Math.round(32-10*t)})`;
+}
+function hmTextColor(v){ return Math.abs(v)>0.3?'#fff':'#9ca3b0'; }
+function hmLabel(v){
+  if(v>=0.7) return 'Very Strong Positive';
+  if(v>=0.4) return 'Moderate Positive';
+  if(v>=0.1) return 'Weak Positive';
+  if(v>=-0.1) return 'Near Zero';
+  if(v>=-0.4) return 'Weak Negative';
+  if(v>=-0.7) return 'Moderate Negative';
+  return 'Very Strong Negative';
+}
+
+function renderHeatmap() {
+  const container = document.getElementById('heatmapContainer');
+  const ord = hmCityOrder, size = ord.length;
+  const grid = document.createElement('div');
+  grid.style.cssText = `display:grid;grid-template-columns:110px repeat(${size},34px);gap:2px`;
+  grid.appendChild(document.createElement('div'));
+  ord.forEach(ci => {
+    const l=document.createElement('div'); l.className='col-label'; l.textContent=hmCities[ci]; grid.appendChild(l);
+  });
+  ord.forEach((ri,rowIdx) => {
+    const rl=document.createElement('div'); rl.className='row-label'; rl.textContent=hmCities[ri]; grid.appendChild(rl);
+    ord.forEach((ci,colIdx) => {
+      const v=hmCorrMatrix[ri][ci], cell=document.createElement('div');
+      cell.className='cell'; cell.id=`cell-${rowIdx}-${colIdx}`;
+      cell.style.background=hmColor(v); cell.style.color=hmTextColor(v);
+      if(hmShowValues) cell.textContent=v.toFixed(2);
+      cell.addEventListener('mouseenter',()=>showHmTooltip(ri,ci,v));
+      grid.appendChild(cell);
+    });
+  });
+  container.innerHTML=''; container.appendChild(grid);
+  renderHmStats(); renderHmTopPairs();
+}
+
+function showHmTooltip(ri,ci,v) {
+  const col = v>0?'#00ffc8':v<0?'#ff5f85':'#5a6a90';
+  const desc = v>0?"These cities' levels tend to rise and fall together.":
+               v<0?"When one rises, the other tends to fall.":"No significant relationship.";
+  document.getElementById('tooltipBox').innerHTML = `
+    <div style="font-weight:700;font-size:11px;margin-bottom:4px">${hmCities[ri]} ↔ ${hmCities[ci]}</div>
+    <div class="tooltip-val" style="color:${col}">${v.toFixed(4)}</div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted)">${hmLabel(v)}</div>
+    <div style="margin-top:8px;font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);line-height:1.7">${desc}</div>
+  `;
+}
+
+function renderHmStats() {
+  const n=hmCities.length, vals=[];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) vals.push(hmCorrMatrix[i][j]);
+  const pos=vals.filter(v=>v>0).length, neg=vals.filter(v=>v<0).length;
+  const strong=vals.filter(v=>Math.abs(v)>=0.7).length;
+  const avg=(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3);
+  document.getElementById('statsBox').innerHTML = [
+    ['City Pairs', vals.length, ''],
+    ['Positive r', pos, 'pos'],
+    ['Negative r', neg, 'neg'],
+    ['Strong |r|≥0.7', strong, ''],
+    ['Average r', avg, ''],
+    ['Max r', Math.max(...vals).toFixed(3), 'pos'],
+    ['Min r', Math.min(...vals).toFixed(3), 'neg'],
+  ].map(([l,v,cls])=>`<div class="stat-row"><span class="stat-label">${l}</span><span class="${cls}">${v}</span></div>`).join('');
+}
+
+function renderHmTopPairs() {
+  const n=hmCities.length, pairs=[];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) pairs.push({i,j,v:hmCorrMatrix[i][j]});
+  const top5pos=[...pairs].sort((a,b)=>b.v-a.v).slice(0,5);
+  const top5neg=[...pairs].sort((a,b)=>a.v-b.v).slice(0,5);
+  document.getElementById('topPosBox').innerHTML = top5pos.map(p=>
+    `<div class="pair-row"><span>${hmCities[p.i].slice(0,11)} ↔ ${hmCities[p.j].slice(0,11)}</span><span class="pos" style="font-weight:700">${p.v.toFixed(3)}</span></div>`
+  ).join('');
+  document.getElementById('topNegBox').innerHTML = top5neg.map(p=>
+    `<div class="pair-row"><span>${hmCities[p.i].slice(0,11)} ↔ ${hmCities[p.j].slice(0,11)}</span><span class="neg" style="font-weight:700">${p.v.toFixed(3)}</span></div>`
+  ).join('');
+}
+
+function setHmSort(type,btn) {
+  document.querySelectorAll('.page-panel.active .btn-secondary').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(type==='alpha') { hmCityOrder=hmCities.map((_,i)=>i).sort((a,b)=>hmCities[a].localeCompare(hmCities[b])); }
+  else { hmCityOrder=hmCities.map((_,i)=>({i,avg:hmCorrMatrix[i].reduce((s,v)=>s+v,0)/hmCities.length})).sort((a,b)=>b.avg-a.avg).map(x=>x.i); }
+  renderHeatmap();
+}
+function toggleHmValues(btn) {
+  hmShowValues=!hmShowValues; btn.textContent=hmShowValues?'Hide Values':'Show Values'; renderHeatmap();
+}
+function highlightStrong() {
+  document.querySelectorAll('.cell').forEach(cell => {
+    const [,r,c]=cell.id.split('-').map(Number);
+    if(isNaN(r)||isNaN(c)) return;
+    cell.style.opacity = Math.abs(hmCorrMatrix[hmCityOrder[r]][hmCityOrder[c]])>=0.6?'1':'0.06';
+  });
+}
+function highlightNegative() {
+  document.querySelectorAll('.cell').forEach(cell => {
+    const [,r,c]=cell.id.split('-').map(Number);
+    if(isNaN(r)||isNaN(c)) return;
+    cell.style.opacity = hmCorrMatrix[hmCityOrder[r]][hmCityOrder[c]]<0?'1':'0.06';
+  });
+}
+function resetHighlight() { document.querySelectorAll('.cell').forEach(c=>c.style.opacity='1'); }
+
+// ══════════════════════════════════════════════════════════════════
+// CLUSTERING
+// ══════════════════════════════════════════════════════════════════
+function buildClusterControls() {
+  document.getElementById('clPollutant').innerHTML =
+    numericCols.map((c,i)=>`<option ${i===0?'selected':''}>${c}</option>`).join('');
+}
+
+function runClustering() {
+  const col = document.getElementById('clPollutant').value;
+  const K   = parseInt(document.getElementById('clK').value);
+
+  // Compute per-city mean for selected pollutant
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+
+  // Use ALL numeric cols for multi-dimensional clustering, but scatter on mean vs std
+  const cityStats = cities.map(city => {
+    const rows = rawData.filter(r=>r.City===city);
+    const vals = rows.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+    const mean = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    const std  = vals.length>1 ? Math.sqrt(vals.reduce((s,v)=>s+(v-mean)**2,0)/vals.length) : 0;
+    const max  = vals.length ? Math.max(...vals) : 0;
+    return { city, mean, std, max, n:vals.length };
+  }).filter(s=>s.n>0);
+
+  if(!cityStats.length) return;
+
+  // K-Means on [mean, std] — 2D city space
+  const pts = cityStats.map(s=>[s.mean, s.std]);
+  const assignments = kMeans(pts, K);
+  cityStats.forEach((s,i) => s.cluster = assignments[i]);
+
+  document.getElementById('clEmpty').style.display='none';
+  document.getElementById('clLayout').style.display='block';
+  document.getElementById('clScatterTitle').textContent = `${col} — City Clusters (Mean vs Std Dev)`;
+
+  // Scatter: x=mean, y=std, one point per city
+  if(clusterChart) clusterChart.destroy();
+  const scatterDatasets = Array(K).fill(0).map((_,k)=>({
+    label:`Cluster ${k+1}`,
+    data: cityStats.filter(s=>s.cluster===k).map(s=>({x:s.mean, y:s.std, city:s.city})),
+    backgroundColor: PALETTE[k]+'aa',
+    borderColor: PALETTE[k],
+    borderWidth:1, pointRadius:7, pointHoverRadius:10,
+  }));
+  clusterChart = new Chart(document.getElementById('clusterChartCanvas'), {
+    type:'scatter',
+    data:{ datasets: scatterDatasets },
+    options:{
+      animation:{duration:600},
+      plugins:{
+        legend:{labels:{font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.raw.city}: mean=${ctx.parsed.x.toFixed(2)}, std=${ctx.parsed.y.toFixed(2)}`}}
+      },
+      scales:{
+        x:{title:{display:true,text:`Mean ${col}`,font:{size:11}},grid:{color:'#1e2840'}},
+        y:{title:{display:true,text:`Std Dev ${col}`,font:{size:11}},grid:{color:'#1e2840'}}
+      }
+    }
+  });
+
+  // Pie: cluster sizes (by city count)
+  const sizes = Array(K).fill(0);
+  cityStats.forEach(s => sizes[s.cluster]++);
+  if(clusterPieChart) clusterPieChart.destroy();
+  clusterPieChart = new Chart(document.getElementById('clusterPieCanvas'), {
+    type:'doughnut',
+    data:{
+      labels: sizes.map((_,i)=>`Cluster ${i+1}`),
+      datasets:[{data:sizes, backgroundColor:PALETTE.slice(0,K), borderWidth:0, hoverOffset:6}]
+    },
+    options:{plugins:{legend:{labels:{font:{size:10},boxWidth:10}}}}
+  });
+
+  // Centroids
+  document.getElementById('clusterCentroids').innerHTML = Array(K).fill(0).map((_,k)=>{
+    const members = cityStats.filter(s=>s.cluster===k);
+    const avgMean = members.reduce((s,c)=>s+c.mean,0)/members.length;
+    const avgStd  = members.reduce((s,c)=>s+c.std,0)/members.length;
+    const cityNames = members.map(c=>c.city).join(', ');
+    return `<div style="border-left:3px solid ${PALETTE[k]};padding-left:8px;margin:6px 0">
+      <strong style="color:${PALETTE[k]}">Cluster ${k+1}</strong> (${members.length} cities)<br>
+      Mean ${col}: ${avgMean.toFixed(2)} · Std: ${avgStd.toFixed(2)}<br>
+      <span style="color:var(--muted);font-size:9px">${cityNames}</span>
+    </div>`;
+  }).join('');
+
+  // Bar: mean of selected pollutant per cluster
+  if(clusterBarChart) clusterBarChart.destroy();
+  const barDatasets = Array(K).fill(0).map((_,k)=>{
+    const members = cityStats.filter(s=>s.cluster===k);
+    const avgMean = members.length ? members.reduce((s,c)=>s+c.mean,0)/members.length : 0;
+    const avgStd  = members.length ? members.reduce((s,c)=>s+c.std,0)/members.length : 0;
+    const avgMax  = members.length ? members.reduce((s,c)=>s+c.max,0)/members.length : 0;
+    return {
+      label:`Cluster ${k+1}`,
+      data:[avgMean, avgStd, avgMax],
+      backgroundColor:PALETTE[k]+'cc', borderRadius:3
+    };
+  });
+  clusterBarChart = new Chart(document.getElementById('clusterBarCanvas'), {
+    type:'bar',
+    data:{ labels:[`Mean ${col}`,`Std Dev ${col}`,`Max ${col}`], datasets:barDatasets },
+    options:{
+      plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
+      scales:{
+        x:{grid:{color:'#1e2840'},ticks:{font:{size:10}}},
+        y:{grid:{color:'#1e2840'},ticks:{font:{size:9}},beginAtZero:true}
+      }
+    }
+  });
+}
+
+function buildClusterDatasets(rows, K, groupFn, labels) {
+  const groups = {};
+  rows.forEach(r => {
+    const k = groupFn(r);
+    if(!groups[k]) groups[k] = [];
+    groups[k].push({x:r.x, y:r.y});
+  });
+  return Object.entries(groups).map(([k,pts],i) => ({
+    label: labels ? k : `Cluster ${parseInt(k)+1}`,
+    data: pts,
+    backgroundColor: PALETTE[i%PALETTE.length]+'aa',
+    borderColor: PALETTE[i%PALETTE.length],
+    borderWidth:1,
+    pointRadius: 4,
+    pointHoverRadius: 7,
+  }));
+}
+
+function computeCentroids(rows, K, xCol, yCol) {
+  return Array(K).fill(0).map((_,k) => {
+    const krows = rows.filter(r=>r.cluster===k);
+    if(!krows.length) return {x:0,y:0,n:0};
+    return {
+      x: krows.reduce((s,r)=>s+r.x,0)/krows.length,
+      y: krows.reduce((s,r)=>s+r.y,0)/krows.length,
+      n: krows.length
+    };
+  });
+}
+
+// ── K-Means
+function kMeans(pts, K, maxIter=100) {
+  let centroids = pts.slice(0,K).map(p=>[...p]);
+  let assignments = new Array(pts.length).fill(0);
+  for(let iter=0; iter<maxIter; iter++) {
+    // Assign
+    let changed = false;
+    pts.forEach((p,i) => {
+      let best=0, bestDist=Infinity;
+      centroids.forEach((c,k) => {
+        const d = (p[0]-c[0])**2 + (p[1]-c[1])**2;
+        if(d<bestDist){ bestDist=d; best=k; }
+      });
+      if(assignments[i]!==best){ assignments[i]=best; changed=true; }
+    });
+    if(!changed) break;
+    // Update
+    centroids = Array(K).fill(0).map(()=>[0,0]);
+    const counts = Array(K).fill(0);
+    pts.forEach((p,i) => {
+      const k=assignments[i];
+      centroids[k][0]+=p[0]; centroids[k][1]+=p[1]; counts[k]++;
+    });
+    centroids.forEach((c,k) => {
+      if(counts[k]){ c[0]/=counts[k]; c[1]/=counts[k]; }
+    });
+  }
+  return assignments;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SIGNAL RECONSTRUCTION
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('sigMissing').addEventListener('input', function(){
+  document.getElementById('sigMissingVal').textContent = this.value+'%';
+});
+document.getElementById('sigCoeffs').addEventListener('input', function(){
+  document.getElementById('sigCoeffsVal').textContent = this.value;
+});
+
+function buildSignalControls() {
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+  document.getElementById('sigCity').innerHTML = cities.map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('sigPollutant').innerHTML = numericCols.map(c=>`<option>${c}</option>`).join('');
+}
+
+function runSignal() {
+  const city    = document.getElementById('sigCity').value;
+  const col     = document.getElementById('sigPollutant').value;
+  const missPct = parseInt(document.getElementById('sigMissing').value)/100;
+  const nCoeffs = parseInt(document.getElementById('sigCoeffs').value);
+
+  const cityRows = rawData
+    .filter(r=>r.City===city)
+    .sort((a,b)=>a.Date.localeCompare(b.Date));
+
+  const signal = cityRows.map(r=>parseFloat(r[col]));
+  const validIdx = signal.map((v,i)=>isNaN(v)?null:i).filter(i=>i!==null);
+  if(validIdx.length < 10) {
+    alert('Not enough data points for this city/pollutant combination.');
+    return;
+  }
+
+  // Create corrupted signal
+  const mask = new Array(signal.length).fill(false);
+  const candidates = [...validIdx];
+  shuffleArray(candidates);
+  const nMiss = Math.floor(candidates.length * missPct);
+  candidates.slice(0,nMiss).forEach(i => mask[i]=true);
+
+  const corrupted = signal.map((v,i) => mask[i] ? null : v);
+
+  // DCT reconstruction only
+  const dctRecon  = dctReconstruct(corrupted, signal, nCoeffs);
+
+  // Metrics
+  const missingSignal = mask.map((m,i)=>m?signal[i]:null).filter(v=>v!==null);
+  const dctAtMissing  = mask.map((m,i)=>m?dctRecon[i]:null).filter(v=>v!==null);
+
+  const dctMSE  = mse(dctAtMissing, missingSignal);
+  const dctStd  = stdDev(dctAtMissing.map((v,i)=>v-missingSignal[i]));
+
+  document.getElementById('sigEmpty').style.display='none';
+  document.getElementById('sigLayout').style.display='block';
+
+  document.getElementById('sigMetrics').innerHTML = [
+    [nMiss,            'Points Removed',  `${(missPct*100).toFixed(0)}% of valid data`],
+    [dctMSE.toFixed(3),'DCT MSE',         'Mean Squared Error at removed points'],
+    [dctStd.toFixed(3),'Error Std Dev',   'spread of reconstruction errors'],
+    [nCoeffs,          'DCT Coefficients','frequency components kept'],
+  ].map(([v,l,s])=>`<div class="metric-card"><div class="metric-val">${v}</div><div class="metric-lbl">${l}</div>${s?`<div class="metric-sub">${s}</div>`:''}</div>`).join('');
+
+  const chartOpts = {
+    animation:{duration:500},
+    plugins:{legend:{labels:{font:{size:9}, boxWidth:10}}},
+    scales:{
+      x:{grid:{color:'#1e2840'}, ticks:{maxTicksLimit:8,font:{size:8}}},
+      y:{grid:{color:'#1e2840'}, ticks:{font:{size:9}}}
+    }
+  };
+
+  const labels = cityRows.map((_,i)=>i);
+  const step   = Math.max(1, Math.floor(labels.length/80));
+  const xThin  = labels.filter((_,i)=>i%step===0);
+
+  // Replace NaN in signal with null for Chart.js (renders gaps cleanly)
+  const signalClean = signal.map(v => isNaN(v) ? null : v);
+  const dctClean    = dctRecon.map(v => (typeof v==='number'&&!isNaN(v)) ? v : null);
+
+  function thinArr(arr) { return arr.filter((_,i)=>i%step===0); }
+
+  // Chart 1: original vs corrupted
+  if(sigChart1) sigChart1.destroy();
+  const corruptedDisplay = corrupted.map((v,i)=> mask[i] ? null : (isNaN(v)?null:v));
+  const missingPts = signal.map((v,i)=> mask[i] ? (isNaN(v)?null:v) : null);
+  sigChart1 = new Chart(document.getElementById('sigChart1'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'Original', data:signalClean, borderColor:'#00a8ff', borderWidth:1.5,
+         pointRadius:0, tension:0.3, fill:false, spanGaps:true},
+        {label:'Corrupted (gaps)', data:corruptedDisplay, borderColor:'rgba(255,95,133,0.7)', borderWidth:1.5,
+         pointRadius:0, tension:0.3, fill:false, spanGaps:false},
+        {label:'Missing pts', data:missingPts, borderColor:'transparent',
+         backgroundColor:'#ffc300', pointRadius:3, showLine:false}
+      ]
+    },
+    options: chartOpts
+  });
+
+  // Chart 2: DCT reconstruction
+  if(sigChart2) sigChart2.destroy();
+  sigChart2 = new Chart(document.getElementById('sigChart2'),{
+    type:'line',
+    data:{
+      labels: xThin,
+      datasets:[
+        {label:'Original', data:thinArr(signalClean),
+         borderColor:'#00a8ff', borderWidth:2,
+         pointRadius:0, tension:0.3, fill:false, spanGaps:true},
+        {label:'DCT Recon', data:thinArr(dctClean),
+         borderColor:'#00ffc8', borderWidth:2.5,
+         pointRadius:0, tension:0.3, fill:false, spanGaps:true}
+      ]
+    },
+    options: chartOpts
+  });
+
+  // Chart 3: Reconstruction error — only at masked (removed) positions
+  if(sigChart3) sigChart3.destroy();
+
+  const maskedPositions = [], maskedErrors = [], maskedOriginal = [], maskedRecon = [];
+  for(let i = 0; i < signal.length; i++) {
+    if(!mask[i]) continue;
+    const orig = signal[i];
+    const recon = dctRecon[i];
+    if(typeof orig !== 'number' || isNaN(orig)) continue;
+    if(typeof recon !== 'number' || isNaN(recon)) continue;
+    const err = Math.abs(recon - orig);
+    maskedPositions.push(i);
+    maskedErrors.push(err);
+    maskedOriginal.push(orig);
+    maskedRecon.push(recon);
+  }
+
+  const maxErr = maskedErrors.length ? Math.max(...maskedErrors) : 1;
+  const errColors = maskedErrors.map(e => {
+    const t = e / maxErr;
+    if(t < 0.33) return 'rgba(0,200,80,0.85)';
+    if(t < 0.66) return 'rgba(255,195,0,0.85)';
+    return 'rgba(255,95,133,0.95)';
+  });
+
+  sigChart3 = new Chart(document.getElementById('sigChart3'), {
+    type: 'bar',
+    data: {
+      labels: maskedPositions,
+      datasets: [{
+        label: '|Error| at removed points',
+        data: maskedErrors,
+        backgroundColor: errColors,
+        borderWidth: 0,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      animation: { duration: 500 },
+      plugins: {
+        legend: { labels: { font: { size: 9 }, boxWidth: 10 } },
+        tooltip: {
+          callbacks: {
+            title: ctx => `Index: ${maskedPositions[ctx[0].dataIndex]}`,
+            label: ctx => [
+              `|Error|: ${maskedErrors[ctx.dataIndex].toFixed(3)}`,
+              `Original: ${maskedOriginal[ctx.dataIndex].toFixed(3)}`,
+              `DCT Recon: ${maskedRecon[ctx.dataIndex].toFixed(3)}`
+            ]
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#1e2840' },
+          ticks: { font: { size: 8 }, maxTicksLimit: 10 },
+          title: { display: true, text: 'Signal Index (masked positions only)', font: { size: 9 } }
+        },
+        y: {
+          grid: { color: '#1e2840' },
+          ticks: { font: { size: 9 } },
+          title: { display: true, text: '|Original − DCT|', font: { size: 9 } },
+          beginAtZero: true,
+          suggestedMax: maxErr * 1.1
+        }
+      }
+    }
+  });
+}
+
+function dctReconstruct(corrupted, original, nCoeffs) {
+  const n = corrupted.length;
+  // Fill nulls/NaN with linear interpolation for better DCT input
+  const filled = new Array(n);
+  for(let i=0;i<n;i++){
+    const v = corrupted[i];
+    if(v!==null && !isNaN(v)){ filled[i]=v; continue; }
+    // find prev and next valid values
+    let pi=-1,ni=-1;
+    for(let j=i-1;j>=0;j--){ if(corrupted[j]!==null&&!isNaN(corrupted[j])){ pi=j; break; } }
+    for(let j=i+1;j<n;j++){ if(corrupted[j]!==null&&!isNaN(corrupted[j])){ ni=j; break; } }
+    if(pi>=0&&ni>=0) filled[i]=corrupted[pi]+(corrupted[ni]-corrupted[pi])*(i-pi)/(ni-pi);
+    else if(pi>=0)   filled[i]=corrupted[pi];
+    else if(ni>=0)   filled[i]=corrupted[ni];
+    else             filled[i]=0;
+  }
+
+  // Compute mean for centering (improves DCT quality)
+  const mean = filled.reduce((a,b)=>a+b,0)/n;
+  const centered = filled.map(v=>v-mean);
+
+  // DCT-II coefficients (only compute nCoeffs, not all n — O(n*nCoeffs))
+  const kLimit = Math.min(nCoeffs, n);
+  const C = new Array(kLimit);
+  const scale0 = 1/Math.sqrt(n);
+  const scaleK = Math.sqrt(2/n);
+  for(let k=0;k<kLimit;k++){
+    let sum=0;
+    const w = Math.PI*k/n;
+    for(let t=0;t<n;t++) sum += centered[t]*Math.cos(w*(2*t+1)*0.5);
+    C[k] = (k===0?scale0:scaleK)*sum;
+  }
+
+  // IDCT reconstruction (only sum over kLimit terms — O(n*nCoeffs))
+  const out = new Array(n);
+  for(let t=0;t<n;t++){
+    let sum = C[0]*scale0;
+    const base = Math.PI*(2*t+1)*0.5/n;
+    for(let k=1;k<kLimit;k++) sum += C[k]*scaleK*Math.cos(k*base);
+    out[t] = sum + mean;
+  }
+  return out;
+}
+
+function pcaReconstruct(corrupted, original) {
+  const filled = corrupted.map((v,i) => v===null ? nanMean(corrupted) : v);
+  const mean   = filled.reduce((a,b)=>a+b,0)/filled.length;
+  const std    = Math.sqrt(filled.reduce((s,v)=>s+(v-mean)**2,0)/filled.length) || 1;
+  const scaled = filled.map(v=>(v-mean)/std);
+  // Simple PCA: project to 1D and back (smoothing effect)
+  const n = scaled.length;
+  const nComp = Math.min(3, Math.floor(n/4));
+  // Build windows
+  const wSize = 5;
+  const smoothed = new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    let s=0,cnt=0;
+    for(let j=Math.max(0,i-wSize);j<=Math.min(n-1,i+wSize);j++){s+=scaled[j];cnt++;}
+    smoothed[i]=s/cnt;
+  }
+  return smoothed.map(v=>v*std+mean);
+}
+
+function nanMean(arr) {
+  const v = arr.filter(x=>x!==null&&!isNaN(x));
+  return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0;
+}
+function mse(pred, actual) {
+  if(!pred.length) return 0;
+  return pred.reduce((s,v,i)=>s+(v-actual[i])**2,0)/pred.length;
+}
+function stdDev(arr) {
+  if(!arr.length) return 0;
+  const m = arr.reduce((a,b)=>a+b,0)/arr.length;
+  return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length);
+}
+function shuffleArray(arr) {
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GRAPH CHECK
+// ══════════════════════════════════════════════════════════════════
+let gcMainChart = null, gcDistChart = null;
+
+function buildGraphCheck() {
+  document.getElementById('gcEmpty').style.display = 'none';
+  document.getElementById('gcLayout').style.display = 'block';
+
+  // Populate X/Y selectors
+  const gcY = document.getElementById('gcY');
+  gcY.innerHTML = numericCols.map((c,i)=>`<option ${i===0?'selected':''}>${c}</option>`).join('');
+
+  // Populate city filter
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+  const cityEl = document.getElementById('gcCity');
+  cities.forEach(c => {
+    const o=document.createElement('option'); o.value=o.textContent=c; cityEl.appendChild(o);
+  });
+
+  // Build stats table
+  buildGcStatsTable();
+}
+
+function buildGcStatsTable() {
+  const tbody = document.getElementById('gcMissingBody');
+  tbody.innerHTML = numericCols.map(col => {
+    const vals = rawData.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+    const total = rawData.length;
+    const missing = total - vals.length;
+    const pct = (missing/total*100).toFixed(1);
+    const mean = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : '—';
+    const mn = vals.length ? Math.min(...vals).toFixed(2) : '—';
+    const mx = vals.length ? Math.max(...vals).toFixed(2) : '—';
+    const std = vals.length > 1 ? Math.sqrt(vals.reduce((s,v)=>s+(v-parseFloat(mean))**2,0)/vals.length).toFixed(2) : '—';
+    const pctNum = parseFloat(pct);
+    const sev = pctNum<15?'low':pctNum<35?'med':'high';
+    return `<tr>
+      <td style="font-weight:600">${col}</td>
+      <td>${total.toLocaleString()}</td>
+      <td>${missing.toLocaleString()}</td>
+      <td><span class="badge badge-${sev}">${pct}%</span></td>
+      <td>${mn}</td><td>${mx}</td><td>${mean}</td><td>${std}</td>
+    </tr>`;
+  }).join('');
+
+  const totalCells = rawData.length * numericCols.length;
+  const totalMissing = numericCols.reduce((s,col)=>s+rawData.filter(r=>isMissing(r[col])).length,0);
+  const colsWithMissing = numericCols.filter(col=>rawData.some(r=>isMissing(r[col]))).length;
+  document.getElementById('gcStats').innerHTML = [
+    [rawData.length.toLocaleString(), 'Total Rows', ''],
+    [numericCols.length, 'Numeric Columns', ''],
+    [totalMissing.toLocaleString(), 'Missing Cells', (totalMissing/totalCells*100).toFixed(1)+'% of dataset'],
+    [colsWithMissing, 'Cols with Missing', 'out of '+numericCols.length],
+  ].map(([v,l,s])=>`<div class="metric-card"><div class="metric-val">${v}</div><div class="metric-lbl">${l}</div>${s?`<div class="metric-sub">${s}</div>`:''}</div>`).join('');
+}
+
+function runGraphCheck() {
+  const col  = document.getElementById('gcY').value;
+  const type = document.getElementById('gcType').value;
+  const cityFilter = document.getElementById('gcCity').value;
+
+  const allCities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+  const cities = cityFilter === 'ALL' ? allCities : [cityFilter];
+
+  if(!cities.length){ alert('No cities found.'); return; }
+
+  if(gcMainChart) gcMainChart.destroy();
+  if(gcDistChart) gcDistChart.destroy();
+
+  // ── Bar: city mean comparison ──
+  if(type === 'bar') {
+    const cityMeans = cities.map(c => {
+      const vals = rawData.filter(r=>r.City===c).map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    });
+    document.getElementById('gcChartTitle').textContent = `${col} — Mean per City`;
+    gcMainChart = new Chart(document.getElementById('gcMainCanvas'), {
+      type:'bar',
+      data:{
+        labels: cities,
+        datasets:[{label:`Mean ${col}`, data:cityMeans,
+          backgroundColor: PALETTE.map((_,i)=>PALETTE[i%PALETTE.length]+'cc'),
+          borderColor: PALETTE.map((_,i)=>PALETTE[i%PALETTE.length]),
+          borderWidth:1, borderRadius:3}]
+      },
+      options:{
+        animation:{duration:400},
+        plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+        scales:{
+          x:{grid:{color:'#1e2840'},ticks:{font:{size:9},maxRotation:45}},
+          y:{grid:{color:'#1e2840'},ticks:{font:{size:9}},title:{display:true,text:`Mean ${col}`,font:{size:10}},beginAtZero:true}
+        }
+      }
+    });
+
+    // Distribution of all values for this pollutant
+    const allVals = rawData.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+    const buckets=20, mn=allVals[0], mx=allVals[allVals.length-1], step=(mx-mn)/buckets||1;
+    const hist=Array(buckets).fill(0);
+    allVals.forEach(v=>{ const b=Math.min(Math.floor((v-mn)/step),buckets-1); hist[b]++; });
+    gcDistChart = new Chart(document.getElementById('gcDistCanvas'),{
+      type:'bar',
+      data:{
+        labels:hist.map((_,i)=>(mn+i*step).toFixed(1)),
+        datasets:[{label:`${col} Distribution`,data:hist,
+          backgroundColor:'rgba(255,195,0,0.55)', borderColor:'#ffc300', borderWidth:1, borderRadius:2}]
+      },
+      options:{animation:{duration:400},plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+        scales:{x:{grid:{color:'#1e2840'},ticks:{font:{size:8},maxTicksLimit:8,maxRotation:45}},y:{grid:{color:'#1e2840'},ticks:{font:{size:9}}}}}
+    });
+
+  // ── Line: one line per city ──
+  } else if(type === 'line') {
+    document.getElementById('gcChartTitle').textContent = `${col} — City Trends Over Time`;
+    // Get sorted unique dates
+    const dates = [...new Set(rawData.map(r=>r.Date))].filter(Boolean).sort();
+    const datasets = cities.map((c,i) => {
+      const cityMap = {};
+      rawData.filter(r=>r.City===c).forEach(r=>{ const v=parseFloat(r[col]); if(!isNaN(v)) cityMap[r.Date]=v; });
+      return {
+        label: c,
+        data: dates.map(d=>cityMap[d]??null),
+        borderColor: PALETTE[i%PALETTE.length],
+        borderWidth: 1.5, pointRadius:0, tension:0.3, fill:false,
+        spanGaps: true
+      };
+    });
+    gcMainChart = new Chart(document.getElementById('gcMainCanvas'), {
+      type:'line',
+      data:{ labels: dates, datasets },
+      options:{
+        animation:{duration:400},
+        plugins:{legend:{labels:{font:{size:8},boxWidth:8}}},
+        scales:{
+          x:{grid:{color:'#1e2840'},ticks:{font:{size:7},maxTicksLimit:8,maxRotation:30}},
+          y:{grid:{color:'#1e2840'},ticks:{font:{size:9}},title:{display:true,text:col,font:{size:10}}}
+        }
+      }
+    });
+
+    const allVals = rawData.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+    const buckets=20, mn=allVals[0], mx=allVals[allVals.length-1], step=(mx-mn)/buckets||1;
+    const hist=Array(buckets).fill(0);
+    allVals.forEach(v=>{ const b=Math.min(Math.floor((v-mn)/step),buckets-1); hist[b]++; });
+    gcDistChart = new Chart(document.getElementById('gcDistCanvas'),{
+      type:'bar',
+      data:{labels:hist.map((_,i)=>(mn+i*step).toFixed(1)),
+        datasets:[{label:`${col} Distribution`,data:hist,backgroundColor:'rgba(255,195,0,0.55)',borderColor:'#ffc300',borderWidth:1,borderRadius:2}]},
+      options:{animation:{duration:400},plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+        scales:{x:{grid:{color:'#1e2840'},ticks:{font:{size:8},maxTicksLimit:8,maxRotation:45}},y:{grid:{color:'#1e2840'},ticks:{font:{size:9}}}}}
+    });
+
+  // ── Scatter: city mean X (first pollutant) vs Y (selected pollutant) ──
+  } else {
+    document.getElementById('gcChartTitle').textContent = `${col} — City Scatter (Mean per City)`;
+    const scatterPts = cities.map((c,i) => {
+      const rows = rawData.filter(r=>r.City===c);
+      const yVals = rows.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+      const mean = yVals.length ? yVals.reduce((a,b)=>a+b,0)/yVals.length : null;
+      return { city:c, y:mean, color:PALETTE[i%PALETTE.length] };
+    }).filter(p=>p.y!==null);
+
+    gcMainChart = new Chart(document.getElementById('gcMainCanvas'),{
+      type:'scatter',
+      data:{
+        datasets: scatterPts.map((p,i)=>({
+          label: p.city,
+          data: [{x:i, y:p.y}],
+          backgroundColor: p.color+'aa',
+          borderColor: p.color,
+          pointRadius: 8, pointHoverRadius:10
+        }))
+      },
+      options:{
+        animation:{duration:400},
+        plugins:{legend:{labels:{font:{size:8},boxWidth:8}}},
+        scales:{
+          x:{grid:{color:'#1e2840'},ticks:{callback:(_,i)=>scatterPts[i]?.city||'',font:{size:8},maxRotation:45}},
+          y:{grid:{color:'#1e2840'},ticks:{font:{size:9}},title:{display:true,text:`Mean ${col}`,font:{size:10}}}
+        }
+      }
+    });
+
+    const allVals = rawData.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+    const buckets=20, mn=allVals[0], mx=allVals[allVals.length-1], step=(mx-mn)/buckets||1;
+    const hist=Array(buckets).fill(0);
+    allVals.forEach(v=>{ const b=Math.min(Math.floor((v-mn)/step),buckets-1); hist[b]++; });
+    gcDistChart = new Chart(document.getElementById('gcDistCanvas'),{
+      type:'bar',
+      data:{labels:hist.map((_,i)=>(mn+i*step).toFixed(1)),
+        datasets:[{label:`${col} Distribution`,data:hist,backgroundColor:'rgba(255,195,0,0.55)',borderColor:'#ffc300',borderWidth:1,borderRadius:2}]},
+      options:{animation:{duration:400},plugins:{legend:{labels:{font:{size:9},boxWidth:10}}},
+        scales:{x:{grid:{color:'#1e2840'},ticks:{font:{size:8},maxTicksLimit:8,maxRotation:45}},y:{grid:{color:'#1e2840'},ticks:{font:{size:9}}}}}
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// IMPUTATION (from Manvik.html — full algorithm preserved)
+// ══════════════════════════════════════════════════════════════════
+function buildImputeUI() {
+  document.getElementById('imputeEmpty').style.display='none';
+  document.getElementById('imputeLayout').style.display='block';
+
+  // Missing table
+  const tbody = document.getElementById('missingBody');
+  tbody.innerHTML = numericCols.map(col => {
+    const total   = rawData.length;
+    const missing = rawData.filter(r=>isMissing(r[col])).length;
+    const pct     = (missing/total*100).toFixed(1);
+    const pctNum  = parseFloat(pct);
+    const sev     = pctNum<15?'low':pctNum<35?'med':'high';
+    const sLbl    = pctNum<15?'Low':pctNum<35?'Moderate':'High';
+    const barCol  = pctNum<15?'#00c850':pctNum<35?'#ffc300':'#ff5f85';
+    return `<tr>
+      <td style="font-weight:600">${col}</td>
+      <td>${total.toLocaleString()}</td>
+      <td>${missing.toLocaleString()}</td>
+      <td>${pct}%</td>
+      <td><div class="bar-wrap"><div class="bar-fill" style="width:${Math.min(pctNum,100)}%;background:${barCol}"></div></div></td>
+      <td><span class="badge badge-${sev}">${sLbl}</span></td>
+    </tr>`;
+  }).join('');
+
+  // City filter
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+  const cityEl = document.getElementById('impCity');
+  cities.forEach(c => {
+    const o=document.createElement('option'); o.value=o.textContent=c; cityEl.appendChild(o);
+  });
+
+  // Col filter
+  const colEl = document.getElementById('impCol');
+  numericCols.forEach(c => {
+    const o=document.createElement('option'); o.value=o.textContent=c; colEl.appendChild(o);
+  });
+}
+
+function isMissing(val) {
+  return val===''||val===null||val===undefined||(typeof val==='string'&&val.trim()==='');
+}
+
+function updateMethodInfo() {
+  const m = document.getElementById('impMethod').value;
+  const info = {
+    mean:'<strong>Mean Imputation:</strong> Replace each missing value with the city-level column average. Fast and simple, but flattens temporal trends.',
+    linear:'<strong>Linear Interpolation:</strong> Estimate missing values by drawing straight lines between adjacent known values (per city, sorted by date). Preserves linear trends well.',
+    spline:'<strong>Cubic Spline:</strong> Fit a smooth piecewise cubic polynomial through known points. Produces natural curves — best for longer gaps. Requires ≥3 known values.',
+    both:'<strong>Linear + Mean:</strong> Linear interpolation fills interior gaps, then mean fills any remaining edge gaps. Best all-around coverage.',
+    spline_mean:'<strong>Spline + Mean:</strong> Cubic spline fills interior gaps smoothly, then mean covers edge gaps.'
+  };
+  document.getElementById('methodInfo').innerHTML = info[m]||'';
+}
+
+function runImputation() {
+  const method   = document.getElementById('impMethod').value;
+  const cityFilt = document.getElementById('impCity').value;
+  const colFilt  = document.getElementById('impCol').value;
+
+  document.getElementById('progressBar').style.display='block';
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('runImpBtn').disabled=true;
+
+  setTimeout(()=>{
+    imputedData  = rawData.map(r=>({...r}));
+    imputedFlags = rawData.map(()=>({}));
+
+    const targetCols = colFilt==='ALL' ? numericCols : [colFilt];
+    const allCities  = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+    const cities     = cityFilt==='ALL' ? allCities : [cityFilt];
+    let totalFilled  = 0;
+
+    cities.forEach((city,ci) => {
+      document.getElementById('progressFill').style.width=((ci/cities.length)*100)+'%';
+      const cityIdxs = rawData.map((r,i)=>({r,i})).filter(x=>x.r.City===city)
+        .sort((a,b)=>a.r.Date.localeCompare(b.r.Date)).map(x=>x.i);
+      targetCols.forEach(col => {
+        if(method==='mean')         totalFilled+=imputeMean(cityIdxs,col);
+        else if(method==='linear')  totalFilled+=imputeLinear(cityIdxs,col);
+        else if(method==='spline')  totalFilled+=imputeSpline(cityIdxs,col);
+        else if(method==='spline_mean'){ totalFilled+=imputeSpline(cityIdxs,col); totalFilled+=imputeMean(cityIdxs,col); }
+        else { totalFilled+=imputeLinear(cityIdxs,col); totalFilled+=imputeMean(cityIdxs,col); }
+      });
+    });
+
+    document.getElementById('progressFill').style.width='100%';
+    document.getElementById('runImpBtn').disabled=false;
+    renderImputeResults(totalFilled);
+    setTimeout(()=>{ document.getElementById('progressBar').style.display='none'; },600);
+  },60);
+}
+
+function imputeMean(cityIdxs, col) {
+  const vals = cityIdxs.map(i=>parseFloat(imputedData[i][col])).filter(v=>!isNaN(v));
+  if(!vals.length) return 0;
+  const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+  let filled=0;
+  cityIdxs.forEach(i=>{
+    if(isMissing(imputedData[i][col])){ imputedData[i][col]=mean.toFixed(4); imputedFlags[i][col]='mean'; filled++; }
+  });
+  return filled;
+}
+
+function imputeLinear(cityIdxs, col) {
+  let filled=0; const n=cityIdxs.length; let i=0;
+  while(i<n){
+    if(isMissing(imputedData[cityIdxs[i]][col])){
+      const gapStart=i; let j=i;
+      while(j<n&&isMissing(imputedData[cityIdxs[j]][col])) j++;
+      const gapEnd=j-1, leftIdx=gapStart-1, rightIdx=gapEnd+1;
+      const hasLeft=leftIdx>=0&&!isMissing(imputedData[cityIdxs[leftIdx]][col]);
+      const hasRight=rightIdx<n&&!isMissing(imputedData[cityIdxs[rightIdx]][col]);
+      if(hasLeft&&hasRight){
+        const lv=parseFloat(imputedData[cityIdxs[leftIdx]][col]);
+        const rv=parseFloat(imputedData[cityIdxs[rightIdx]][col]);
+        const steps=rightIdx-leftIdx;
+        for(let k=gapStart;k<=gapEnd;k++){
+          const t=(k-leftIdx)/steps;
+          imputedData[cityIdxs[k]][col]=(lv+t*(rv-lv)).toFixed(4);
+          imputedFlags[cityIdxs[k]][col]='linear'; filled++;
+        }
+      }
+      i=j;
+    } else i++;
+  }
+  return filled;
+}
+
+function imputeSpline(cityIdxs, col) {
+  let filled=0; const n=cityIdxs.length;
+  const known=[];
+  cityIdxs.forEach((rowIdx,pos)=>{
+    const v=parseFloat(imputedData[rowIdx][col]);
+    if(!isNaN(v)) known.push({x:pos,y:v});
+  });
+  if(known.length<2) return filled;
+  if(known.length===2) return imputeLinear(cityIdxs,col);
+  const m=known.length, xs=known.map(p=>p.x), ys=known.map(p=>p.y);
+  const h=[];
+  for(let i=0;i<m-1;i++) h.push(xs[i+1]-xs[i]);
+  const rhs=new Array(m).fill(0);
+  for(let i=1;i<m-1;i++) rhs[i]=6*((ys[i+1]-ys[i])/h[i]-(ys[i]-ys[i-1])/h[i-1]);
+  const diag=new Array(m).fill(2), lower=new Array(m).fill(0), upper=new Array(m).fill(0);
+  for(let i=1;i<m-1;i++){ diag[i]=2*(h[i-1]+h[i]); lower[i]=h[i-1]; upper[i]=h[i]; }
+  const M=new Array(m).fill(0), c=new Array(m).fill(0), d2=rhs.slice();
+  c[1]=upper[1]/diag[1]; d2[1]=d2[1]/diag[1];
+  for(let i=2;i<m-1;i++){ const denom=diag[i]-lower[i]*c[i-1]; c[i]=upper[i]/denom; d2[i]=(d2[i]-lower[i]*d2[i-1])/denom; }
+  M[m-2]=d2[m-2];
+  for(let i=m-3;i>=1;i--) M[i]=d2[i]-c[i]*M[i+1];
+  cityIdxs.forEach((rowIdx,pos)=>{
+    if(!isMissing(imputedData[rowIdx][col])) return;
+    if(pos<=xs[0]||pos>=xs[m-1]) return;
+    let seg=0;
+    for(let i=0;i<m-1;i++) if(xs[i]<=pos&&pos<=xs[i+1]){ seg=i; break; }
+    const dx=pos-xs[seg], hi=h[seg], a=ys[seg];
+    const b=(ys[seg+1]-ys[seg])/hi-hi*(2*M[seg]+M[seg+1])/6;
+    const c2=M[seg]/2, d3=(M[seg+1]-M[seg])/(6*hi);
+    imputedData[rowIdx][col]=(a+b*dx+c2*dx*dx+d3*dx*dx*dx).toFixed(4);
+    imputedFlags[rowIdx][col]='spline'; filled++;
+  });
+  return filled;
+}
+
+function renderImputeResults(totalFilled) {
+  const meanCnt   = imputedFlags.reduce((s,rf)=>s+Object.values(rf).filter(v=>v==='mean').length,0);
+  const linearCnt = imputedFlags.reduce((s,rf)=>s+Object.values(rf).filter(v=>v==='linear').length,0);
+  const splineCnt = imputedFlags.reduce((s,rf)=>s+Object.values(rf).filter(v=>v==='spline').length,0);
+
+  let html = `
+    <div class="result-stat"><span>Total filled:</span><strong>${totalFilled.toLocaleString()}</strong></div>
+    <div class="result-stat"><span>Mean:</span><strong style="color:var(--warn)">${meanCnt.toLocaleString()}</strong></div>
+    <div class="result-stat"><span>Linear:</span><strong style="color:#00c850">${linearCnt.toLocaleString()}</strong></div>
+  `;
+  if(splineCnt) html+=`<div class="result-stat"><span>Spline:</span><strong style="color:#a070d0">${splineCnt.toLocaleString()}</strong></div>`;
+  document.getElementById('resultStats').innerHTML = html;
+
+  const previewRows = imputedData.slice(0,200);
+  document.getElementById('previewTable').innerHTML = `
+    <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${previewRows.map((row,ri)=>`
+        <tr>${headers.map(col=>{
+          const flag=imputedFlags[ri]&&imputedFlags[ri][col];
+          const cls=flag==='mean'?'cell-imputed-mean':flag==='linear'?'cell-imputed-linear':flag==='spline'?'cell-imputed-spline':'cell-original';
+          const val=row[col]!==undefined&&row[col]!==null&&row[col]!==''?row[col]:'—';
+          return `<td class="${cls}">${val}</td>`;
+        }).join('')}</tr>
+      `).join('')}
+    </tbody>
+  `;
+
+  document.getElementById('resultsSection').style.display='block';
+  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function downloadCSV() {
+  const csv  = Papa.unparse(imputedData, {columns:headers});
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='city_day_imputed.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// POLLUTION ALERT
+// ══════════════════════════════════════════════════════════════════
+let paRadarChart = null, paScoreChart = null;
+
+function buildPollutionAlert() {
+  document.getElementById('paEmpty').style.display = 'none';
+  document.getElementById('paLayout').style.display = 'block';
+  renderPollutionAlert();
+}
+
+function renderPollutionAlert() {
+  const metric    = document.getElementById('paMetric').value;
+  const threshold = parseFloat(document.getElementById('paThreshold').value);
+
+  const cities = [...new Set(rawData.map(r=>r.City))].filter(Boolean).sort();
+
+  // Build city × pollutant stats
+  const cityStats = cities.map(city => {
+    const rows = rawData.filter(r=>r.City===city);
+    const pollutantVals = {};
+    numericCols.forEach(col => {
+      const vals = rows.map(r=>parseFloat(r[col])).filter(v=>!isNaN(v));
+      pollutantVals[col] = vals.length
+        ? (metric==='mean' ? vals.reduce((a,b)=>a+b,0)/vals.length : Math.max(...vals))
+        : 0;
+    });
+    return { city, pollutantVals };
+  });
+
+  // Compute per-pollutant max for normalisation
+  const pollutantMaxes = {};
+  numericCols.forEach(col => {
+    pollutantMaxes[col] = Math.max(...cityStats.map(s=>s.pollutantVals[col]), 1);
+  });
+
+  // Overall pollution score = mean of normalised values across all pollutants
+  cityStats.forEach(s => {
+    const normalised = numericCols.map(col => s.pollutantVals[col] / pollutantMaxes[col]);
+    s.score = normalised.reduce((a,b)=>a+b,0) / numericCols.length;
+  });
+
+  // Sort by score descending
+  cityStats.sort((a,b) => b.score - a.score);
+
+  const maxScore = cityStats[0].score;
+  const thresholdScore = maxScore * threshold;
+
+  // Colour logic
+  function alertColor(score) {
+    const t = score / maxScore;
+    if(t >= threshold)      return { bg:'rgba(220,38,38,0.18)', border:'#dc2626', text:'#ef4444', label:'🔴 Critical' };
+    if(t >= threshold*0.75) return { bg:'rgba(234,88,12,0.15)',  border:'#ea580c', text:'#fb923c', label:'🟠 High' };
+    if(t >= threshold*0.5)  return { bg:'rgba(202,138,4,0.12)',  border:'#ca8a04', text:'#facc15', label:'🟡 Moderate' };
+    return                         { bg:'rgba(22,163,74,0.10)',  border:'#16a34a', text:'#4ade80', label:'🟢 Low' };
+  }
+
+  // ── BADGES ──
+  document.getElementById('paBadges').innerHTML = cityStats.map(s => {
+    const c = alertColor(s.score);
+    return `<div style="
+      background:${c.bg}; border:1px solid ${c.border};
+      border-radius:10px; padding:8px 14px; min-width:120px;
+      font-family:'Space Mono',monospace; text-align:center;
+      animation:fadeUp 0.3s ease-out">
+      <div style="font-size:9px;color:var(--muted);margin-bottom:3px">${s.city}</div>
+      <div style="font-size:13px;font-weight:700;color:${c.text}">${(s.score*100).toFixed(1)}%</div>
+      <div style="font-size:8px;color:${c.text};margin-top:2px">${c.label}</div>
+    </div>`;
+  }).join('');
+
+  // ── RADAR: top 6 polluted cities ──
+  const topCities = cityStats.slice(0, 6);
+  if(paRadarChart) paRadarChart.destroy();
+  paRadarChart = new Chart(document.getElementById('paRadarCanvas'), {
+    type: 'radar',
+    data: {
+      labels: numericCols,
+      datasets: topCities.map((s, i) => {
+        const c = alertColor(s.score);
+        return {
+          label: s.city,
+          data: numericCols.map(col => +(s.pollutantVals[col] / pollutantMaxes[col] * 100).toFixed(1)),
+          borderColor: c.border,
+          backgroundColor: c.bg,
+          borderWidth: 1.8,
+          pointRadius: 3,
+          pointBackgroundColor: c.border
+        };
+      })
+    },
+    options: {
+      animation: { duration: 500 },
+      plugins: { legend: { labels: { font:{size:9}, boxWidth:10, color:'#a0b4d0' } } },
+      scales: {
+        r: {
+          grid: { color:'#1e2840' },
+          angleLines: { color:'#1e2840' },
+          pointLabels: { font:{size:8}, color:'#5a6a90' },
+          ticks: { font:{size:7}, color:'#5a6a90', backdropColor:'transparent', stepSize:20 },
+          min: 0, max: 100
+        }
+      }
+    }
+  });
+
+  // ── HORIZONTAL BAR: all cities, score, coloured by alert level ──
+  if(paScoreChart) paScoreChart.destroy();
+  paScoreChart = new Chart(document.getElementById('paScoreCanvas'), {
+    type: 'bar',
+    data: {
+      labels: cityStats.map(s=>s.city),
+      datasets: [{
+        label: 'Pollution Score (%)',
+        data: cityStats.map(s => +(s.score*100).toFixed(1)),
+        backgroundColor: cityStats.map(s => alertColor(s.score).bg.replace('0.18','0.75').replace('0.15','0.75').replace('0.12','0.75').replace('0.10','0.75')),
+        borderColor: cityStats.map(s => alertColor(s.score).border),
+        borderWidth: 1.5,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` Score: ${ctx.parsed.x}%  ${alertColor(cityStats[ctx.dataIndex].score).label}`
+          }
+        }
+      },
+      scales: {
+        x: { grid:{color:'#1e2840'}, ticks:{font:{size:8},color:'#5a6a90'}, max:100,
+             title:{display:true,text:'Pollution Score (%)',font:{size:9},color:'#5a6a90'} },
+        y: { grid:{color:'#1e2840'}, ticks:{font:{size:9},color:'#a0b4d0'} }
+      }
+    }
+  });
+
+  // ── CITY × POLLUTANT TABLE ──
+  const colWidthPx = 62;
+  const tableHtml = `
+    <table style="border-collapse:collapse;font-family:'Space Mono',monospace;font-size:9px;width:100%;min-width:${120+numericCols.length*colWidthPx}px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px 12px;color:var(--muted);border-bottom:1px solid var(--border);width:120px;position:sticky;left:0;background:var(--surface)">City</th>
+          ${numericCols.map(col=>`<th style="text-align:center;padding:6px 4px;color:var(--muted);border-bottom:1px solid var(--border);width:${colWidthPx}px">${col}</th>`).join('')}
+          <th style="text-align:center;padding:6px 8px;color:var(--muted);border-bottom:1px solid var(--border)">Score</th>
+          <th style="text-align:center;padding:6px 8px;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${cityStats.map(s => {
+          const c = alertColor(s.score);
+          return `<tr style="border-bottom:1px solid rgba(30,40,64,0.6);background:${c.bg}">
+            <td style="padding:7px 12px;font-weight:700;color:${c.text};position:sticky;left:0;background:var(--surface2,var(--surface))">${s.city}</td>
+            ${numericCols.map(col => {
+              const norm = s.pollutantVals[col] / pollutantMaxes[col];
+              const val  = s.pollutantVals[col];
+              // cell colour: white→yellow→orange→red based on normalised value
+              const cr = norm>=0.75 ? '#dc2626' : norm>=0.5 ? '#ea580c' : norm>=0.25 ? '#ca8a04' : '#16a34a';
+              const cellBg = norm>=0.75 ? 'rgba(220,38,38,0.22)' : norm>=0.5 ? 'rgba(234,88,12,0.16)' : norm>=0.25 ? 'rgba(202,138,4,0.12)' : 'transparent';
+              return `<td style="text-align:center;padding:5px 4px;color:${cr};background:${cellBg};font-weight:${norm>=0.5?'700':'400'}">${val>=100?val.toFixed(0):val.toFixed(1)}</td>`;
+            }).join('')}
+            <td style="text-align:center;padding:7px 8px;color:${c.text};font-weight:700">${(s.score*100).toFixed(1)}%</td>
+            <td style="text-align:center;padding:7px 8px;color:${c.text}">${c.label}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  document.getElementById('paCityTable').innerHTML = tableHtml;
+}
+</script>
+</body>
+</html>
