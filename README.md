@@ -1,4 +1,3 @@
-
 <p align="Center">
   <img src="images/Logo.jpeg" width="300"/>
 </p>
